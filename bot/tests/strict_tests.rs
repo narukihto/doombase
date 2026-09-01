@@ -1,7 +1,6 @@
 #[path = "../src/main.rs"]
 mod bot_core;
 
-// ◄ [التصحيح هنا] - استدعاء الأدوات بدقة بعد جعلها عامة ومحمية
 use bot_core::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction};
 use num_bigint::BigUint;
 use num_traits::One;
@@ -19,7 +18,7 @@ fn generate_astronomical_number(zeros: usize) -> BigUint {
 mod strict_mev_tests {
     use super::*;
 
-    @test
+    #[test]
     fn test_astronomical_scaling_and_memory_absorption() {
         let start_time = Instant::now();
         let mut nodes = Vec::new();
@@ -41,7 +40,7 @@ mod strict_mev_tests {
         println!("✅ Test 1 Passed: 100k Pools processed in {:?}", duration);
     }
 
-    @test
+    #[test]
     fn test_shortest_path_and_circuit_breaker() {
         let nodes = vec![
             QuantumNode { id: 1, energy_scale: generate_astronomical_number(20), frequency: 0.01 },
@@ -60,7 +59,7 @@ mod strict_mev_tests {
         println!("✅ Test 2 Passed: Circuit breaker isolated volatile pools perfectly.");
     }
 
-    @test
+    #[test]
     fn test_worst_case_scenario_noise() {
         let mut radar = MachineMetric::new();
         
@@ -82,7 +81,7 @@ mod strict_mev_tests {
         println!("✅ Test 3 Passed: Predictive Radar remained operational under extreme microseconds noise.");
     }
 
-    @test
+    #[test]
     fn test_discrete_discontinuous_cryptographic_break() {
         let nodes = vec![
             QuantumNode { id: 101, energy_scale: generate_astronomical_number(60), frequency: 0.11 },
