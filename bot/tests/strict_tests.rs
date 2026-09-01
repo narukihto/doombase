@@ -1,0 +1,112 @@
+#[path = "../src/main.rs"]
+mod bot_core;
+
+use bot_core::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction};
+use num_bigint::BigUint;
+use num_traits::One;
+use std::time::{Instant, Duration};
+
+// دالة مساعدة لتوليد أرقام سيولة فلكية ضخمة جداً (أصفار Wei) لسيناريوهات الفحص الصارم
+fn generate_astronomical_number(zeros: usize) -> BigUint {
+    let mut num_str = "1".to_string();
+    for _ in 0..zeros {
+        num_str.push('0');
+    }
+    BigUint::parse_bytes(num_str.as_bytes(), 10).unwrap_or_else(BigUint::one)
+}
+
+#[cfg(test)]
+mod strict_mev_tests {
+    use super::*;
+
+    // 1. اختبار الضغط الفلكي واستيعاب الذاكرة (100,000 عقدة سيولة بالتوازي)
+    #[test]
+    fn test_astronomical_scaling_and_memory_absorption() {
+        let start_time = Instant::now();
+        let mut nodes = Vec::new();
+
+        // ضخ 100,000 حوض سيولة وهمي لمحاكاة أسواق ضخمة جداً مثل KyberSwap المركبة
+        for i in 1..=100_000 {
+            nodes.push(QuantumNode {
+                id: i,
+                energy_scale: generate_astronomical_number(15 + (i % 10)),
+                frequency: 0.01,
+            });
+        }
+
+        let system = CausalCollapseSystem::new(nodes);
+        let path = system.execute_collapse();
+        let duration = start_time.elapsed();
+
+        // تأكيدات صارمة: يجب ألا يكون المسار فارغاً، ويجب أن تتم المعالجة بالكامل في أقل من 5 ثوانٍ
+        assert!(!path.is_empty(), "💥 Failure: Path computation collapsed to empty!");
+        assert!(duration.as_secs() < 5, "💥 Failure: Engine performance is too slow for MEV!");
+        println!("✅ Test 1 Passed: 100k Pools processed in {:?}", duration);
+    }
+
+    // 2. اختبار قاطع الدائرة وحساب أقصر وأضمن مسار ذري للتبادلات (Circuit Breaker Check)
+    #[test]
+    fn test_shortest_path_and_circuit_breaker() {
+        let nodes = vec![
+            QuantumNode { id: 1, energy_scale: generate_astronomical_number(20), frequency: 0.01 },
+            QuantumNode { id: 2, energy_scale: generate_astronomical_number(18), frequency: 0.50 }, // حوض منزلق السعر جداً (تجاوز حد العتبة)
+            QuantumNode { id: 3, energy_scale: generate_astronomical_number(15), frequency: 0.01 }, 
+        ];
+
+        let mut system = CausalCollapseSystem::new(nodes);
+        system.threshold_limit = 0.10; 
+
+        let path = system.execute_collapse();
+
+        // تأكيدات صارمة: يجب أن يقتنص الأحواض المستقرة ويقطع الدائرة ويطرد الحوض المنزلق رقم 2 لحمايتك
+        assert!(path.contains(&1), "💥 Missing solid node 1");
+        assert!(!path.contains(&2), "💥 Security Risk: Circuit breaker failed to drop volatile pool 2!"); 
+        assert!(path.contains(&3), "💥 Missing solid node 3");
+        println!("✅ Test 2 Passed: Circuit breaker isolated volatile pools perfectly.");
+    }
+
+    // 3. اختبار التنبؤ والسرعة اللحظية في ظروف الضوضاء المتطرفة للأسواق (Worst Case Noise)
+    #[test]
+    fn test_worst_case_scenario_noise() {
+        let mut radar = MachineMetric::new();
+        
+        // محاكاة تدفق سريع وعنيف للأسعار في أجزاء من الميكروثانية لخلخلة الرادار
+        let fast_prices = vec![100.0, 100.005, 99.990, 99.985, 100.010];
+        let interval = Duration::from_micros(1);
+        
+        let mut peak_captured = false;
+        let mut bottom_captured = false;
+
+        for price in fast_prices {
+            let (direction, _) = radar.update_and_predict(price);
+            if direction == Direction::Peak { peak_captured = true; }
+            if direction == Direction::Bottom { bottom_captured = true; }
+            std::thread::sleep(interval);
+        }
+
+        // تأكيدات صارمة: يجب أن ينجح الرادار في التقاط القمم والقيعان حتى مع فوارق الميكروثانية وضوضاء السعر
+        assert!(peak_captured, "💥 Radar missed the Peak upward momentum!");
+        assert!(bottom_captured, "💥 Radar missed the Bottom downward momentum!");
+        println!("✅ Test 3 Passed: Predictive Radar remained operational under extreme microseconds noise.");
+    }
+
+    // 4. اختبار سلامة المنطق عند الانقطاعات البرمجية المفاجئة للشبكة
+    #[test]
+    fn test_discrete_discontinuous_cryptographic_break() {
+        let nodes = vec![
+            QuantumNode { id: 101, energy_scale: generate_astronomical_number(60), frequency: 0.11 },
+            QuantumNode { id: 102, energy_scale: generate_astronomical_number(58), frequency: 0.89 }, 
+            QuantumNode { id: 103, energy_scale: generate_astronomical_number(55), frequency: 0.12 },
+        ];
+
+        let mut system = CausalCollapseSystem::new(nodes);
+        system.threshold_limit = 0.05; 
+
+        let path = system.execute_collapse();
+
+        // تأكيد حتمي: الكود يجب أن يقفز عبر إسقاط الأبعاد ويخيط الفجوات بنجاح لربط المسار المربح دون انهيار برمجى (Panics)
+        assert!(path.contains(&101));
+        assert!(path.contains(&103));
+        println!("✅ Test 4 Passed: Discontinuous network break handled safely.");
+    }
+}
