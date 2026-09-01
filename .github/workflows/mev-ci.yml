@@ -1,0 +1,56 @@
+name: MEV Simulation Suite
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # يتيح لك تشغيل البوت يدوياً في أي وقت بضغطة زر واحدة
+
+jobs:
+  run-simulation:
+    runs-on: ubuntu-latest
+    # تحديد أقصى حد للتشغيل المجاني المستمر على جيت هاب (360 دقيقة = 6 ساعات كاملة)
+    timeout-minutes: 360 
+
+    steps:
+    - name: Checkout Code Base
+      uses: actions/checkout@v4
+
+    - name: Set up Rust Environment
+      uses: actions/rust-lang/setup-rust@v1
+
+    - name: Set up Foundry Toolchain
+      uses: foundry-rs/foundry-toolchain@v1
+
+    # 1. عمل فورك حقيقي وتنافسي لشبكة Base Sepolia عبر رادارات Alchemy الواردة منك
+    - name: Initialize Base Sepolia Network Local Fork
+      run: |
+        anvil --fork-url ${{ secrets.ALCHEMY_BASE_RPC_URL }} --port 8545 &
+      # الـ Anvil ينسخ أحواض السيولة الحالية لشبكة Base محلياً لصفر تكلفة غاز
+
+    # 2. تشغيل جناح الفحص القاسي للتأكد من سرعة التوازي ومقاومة الضوضاء السعرية
+    - name: Run Strict Performance Tests (Strict Tests)
+      run: |
+        cd bot
+        cargo test --release --test strict_tests
+
+    # 3. بناء وترجمة البوت المدمج والعقد الذكي بأعلى مستويات التحسين البرمجي لسرعة الاكتساح
+    - name: Build System Profiles
+      run: |
+        cd contracts
+        forge build
+        cd ../bot
+        cargo build --release
+
+    # 4. محاكاة نشر العقد وتشغيل البوت لـ 6 ساعات متواصلة لمراقبة السرعة والأوامر الذرية
+    - name: Deploy Virtual Contract & Execute 6-Hour Predictive MEV Bot
+      run: |
+        # تعيين عنوان عقد افتراضي تم نشره داخل محاكاة Anvil
+        echo "CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3" >> $GITHUB_ENV
+        
+        cd bot
+        println "🚀 Launching 6-Hour Live Streaming Simulation via Alchemy WSS..."
+        # تشغيل البوت المدمج وتركه يقتنص الصفقات الميكروثانية لـ 6 ساعات كاملة
+        cargo run --release
+      env:
+        ALCHEMY_BASE_RPC_URL: ${{ secrets.ALCHEMY_BASE_RPC_URL }}
+        CONTRACT_ADDR: ${{ env.CONTRACT_ADDRESS }}
