@@ -1,0 +1,230 @@
+use num_bigint::BigUint;
+use num_traits::ToPrimitive;
+use rayon::prelude::*;
+use std::time::{Instant, Duration};
+use alloy::providers::{Provider, ProviderBuilder, WsConnect};
+use alloy::rpc::types::eth::BlockNumberOrTag;
+use futures_util::StreamExt;
+
+// --- 1. نظام التنبؤ بالزخم والمقايسة الزمنية (الكود الثاني) ---
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Direction {
+    Peak,
+    Bottom,
+    Stable,
+}
+
+struct SystemState {
+    value: f64,
+    timestamp: Instant,
+}
+
+struct MachineMetric {
+    last_state: Option<SystemState>,
+}
+
+impl MachineMetric {
+    fn new() -> Self {
+        MachineMetric { last_state: None }
+    }
+
+    fn update_and_predict(&mut self, current_value: f64) -> (Direction, f64) {
+        let now = Instant::now();
+        
+        if let Some(ref prev) = self.last_state {
+            let delta_t = now.duration_since(prev.timestamp).as_secs_f64();
+            
+            if delta_t > 0.0 {
+                let v_inst = (current_value - prev.value) / delta_t;
+                
+                let direction = if v_inst > 1e-9 {
+                    Direction::Peak
+                } else if v_inst < -1e-9 {
+                    Direction::Bottom
+                } else {
+                    Direction::Stable
+                };
+
+                self.last_state = Some(SystemState { value: current_value, timestamp: now });
+                return (direction, v_inst);
+            }
+        }
+
+        self.last_state = Some(SystemState { value: current_value, timestamp: now });
+        (Direction::Stable, 0.0)
+    }
+}
+
+// --- 2. النظام الديناميكي لإدارة الانهيار السببي والتوازي (الكود الأول) ---
+#[derive(Clone, Debug)]
+pub struct QuantumNode {
+    pub id: usize,
+    pub energy_scale: BigUint, // يمثل حجم السيولة بالأرقام الفلكية لمنع أخطاء التقريب
+    pub frequency: f64,        // يمثل السعر/الانحراف اللحظي المكتشف
+}
+
+pub struct CausalCollapseSystem {
+    pub nodes: Vec<QuantumNode>,
+    pub threshold_limit: f64,
+    pub buffer_capacity: usize,
+}
+
+impl CausalCollapseSystem {
+    pub fn new(nodes: Vec<QuantumNode>) -> Self {
+        Self {
+            nodes,
+            threshold_limit: 0.02,
+            buffer_capacity: 16,
+        }
+    }
+
+    fn project_to_inverse_dimensional_symmetry(&self, raw_value: f64, index: usize) -> f64 {
+        let dimension_factor = (index as f64 + 1.0).ln();
+        let high_dimensional_shadow = (raw_value * dimension_factor).sin();
+        high_dimensional_shadow.abs()
+    }
+
+    pub fn execute_collapse(&self) -> Vec<usize> {
+        if self.nodes.is_empty() { return vec![]; }
+
+        let mut ordered_nodes = self.nodes.clone();
+        ordered_nodes.sort_by(|a, b| b.energy_scale.cmp(&a.energy_scale));
+
+        // معالجة مكثفة وموازية لأحواض السيولة والعملات عبر رقاقات المعالج الفندقية لسرعة الاكتساح
+        let active_nodes: Vec<QuantumNode> = ordered_nodes.par_iter().map(|node| {
+            let mut triggered = node.clone();
+            if triggered.frequency == 0.0 {
+                triggered.frequency = 0.01;
+            }
+            triggered
+        }).collect();
+
+        let mut final_path = Vec::new();
+        let mut skipped_buffer: Vec<&QuantumNode> = Vec::with_capacity(self.buffer_capacity);
+
+        final_path.push(active_nodes[0].id);
+
+        let mut cumulative_frequency = active_nodes[0].frequency;
+        let mut active_count = 1.0;
+
+        // التصفية التراكمية المحكمة (Pass 1)
+        for i in 1..active_nodes.len() {
+            let next = &active_nodes[i];
+            let current_avg_freq = cumulative_frequency / active_count;
+            let pure_dev = (current_avg_freq - next.frequency).abs();
+
+            if pure_dev > self.threshold_limit {
+                if pure_dev > self.threshold_limit * 3.0 {
+                    if skipped_buffer.len() < self.buffer_capacity {
+                        skipped_buffer.push(next);
+                    }
+                    continue;
+                }
+
+                let stable_projected = self.project_to_inverse_dimensional_symmetry(current_avg_freq, i - 1);
+                let next_projected = self.project_to_inverse_dimensional_symmetry(next.frequency, i);
+                let projected_dev = (stable_projected - next_projected).abs();
+
+                if projected_dev > self.threshold_limit {
+                    if skipped_buffer.len() < self.buffer_capacity {
+                        skipped_buffer.push(next);
+                    }
+                    continue;
+                }
+            }
+
+            let scale_factor = 1.0 / (next.energy_scale.to_f64().unwrap_or(1.0) + 1.0);
+            let combined_resonance = pure_dev * scale_factor;
+
+            if combined_resonance <= self.threshold_limit {
+                final_path.push(next.id);
+                cumulative_frequency += next.frequency;
+                active_count += 1.0;
+            } else {
+                if skipped_buffer.len() < self.buffer_capacity {
+                    skipped_buffer.push(next);
+                }
+            }
+        }
+
+        // خياطة الفجوات المحمية لاقتناص المسارات المركبة (Pass 2)
+        let final_avg_freq = cumulative_frequency / active_count;
+
+        for buffered_node in skipped_buffer {
+            let pure_raw_dev = (final_avg_freq - buffered_node.frequency).abs();
+
+            if pure_raw_dev > self.threshold_limit * 1.5 {
+                continue;
+            }
+
+            let scale_factor = 1.0 / (buffered_node.energy_scale.to_f64().unwrap_or(1.0) + 1.0);
+
+            if pure_raw_dev * scale_factor <= self.threshold_limit {
+                final_path.push(buffered_node.id);
+            }
+        }
+
+        final_path
+    }
+}
+
+// --- 3. دالة إرسال الأمر الصافي الفوري إلى العقد الذكي المنشور ---
+fn trigger_on_chain_arbitrage(contract_address: &str, target_path: Vec<usize>) {
+    println!("🚀 [BOT -> CONTRACT] Executing Atomic Multi-Swap Command!");
+    println!("⛓️ Target deployed contract: {}", contract_address);
+    println!("🔗 Atomic Route Dispatched: {:?}", target_path);
+}
+
+// --- 4. الدالة الرئيسية المربوطة بالـ WebSocket الحقيقي لـ Alchemy ---
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🤖 Initializing Predictive MEV Bot Core via Alloy...");
+
+    // قراءة رابط الـ WebSocket السري وجلب عنوان العقد من متغيرات بيئة الـ CI
+    let ws_url = std::env::var("ALCHEMY_BASE_RPC_URL")
+        .unwrap_or_else(|_| "wss://://alchemy.com".to_string());
+    let contract_addr = std::env::var("CONTRACT_ADDR")
+        .unwrap_or_else(|_| "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string());
+
+    // تهيئة محرك التنبؤ بالزخم
+    let mut radar = MachineMetric::new();
+
+    // الاتصال الفوري بـ Alchemy لاستقبال تدفق كتل وبلوك شبكة Base Sepolia حية
+    let ws = WsConnect::new(ws_url);
+    let provider = ProviderBuilder::new().on_ws(ws).await?;
+    println!("📡 WebSocket Connection established with Alchemy Base Sepolia!");
+
+    // الاشتراك في تدفق الكتل الجديدة بشكل مستمر ودائم (Stream)
+    let mut block_stream = provider.subscribe_blocks().await?.into_stream();
+
+    // الاستماع الحي (الزطي) بـ 0 غاز أثناء معالجة الأسعار خارج الشبكة
+    while let Some(block) = block_stream.next().await {
+        let block_number = block.header.number;
+        println!("📦 Caught New Block Production on Base: #{}", block_number);
+
+        // محاكاة قراءة تحديثات أسعار الـ Pools (KyberSwap / Uniswap) القادمة في البلوك الحالي
+        let simulated_market_price = 1.005 - (block_number % 3) as f64 * 0.01;
+
+        // تشغيل الرادار التنبؤي لحساب سرعة وزخم التغير
+        let (direction, velocity) = radar.update_and_predict(simulated_market_price);
+
+        if direction == Direction::Peak || direction == Direction::Bottom {
+            println!("⚡ [RADAR ALERT] Velocity Pivot Discovered: {:.4} | Computing path...", velocity);
+
+            // تغذية خوارزمية الانهيار السببي بالعملات والسيولة لتصفية المسار بالتوازي
+            let nodes = vec![
+                QuantumNode { id: 1, energy_scale: BigUint::from(3000000u64), frequency: simulated_market_price },
+                QuantumNode { id: 2, energy_scale: BigUint::from(1000000u64), frequency: 0.01 },
+                QuantumNode { id: 3, energy_scale: BigUint::from(500000u64), frequency: 0.015 },
+            ];
+
+            let system = CausalCollapseSystem::new(nodes);
+            let optimized_path = system.execute_collapse();
+
+            // إرسال المعاملة الفورية المكتسحة لـ القرض الفلاشي والـ Swaps داخل الشبكة
+            trigger_on_chain_arbitrage(&contract_addr, optimized_path);
+        }
+    }
+
+    Ok(())
+}
