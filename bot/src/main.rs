@@ -1,14 +1,13 @@
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use rayon::prelude::*;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use alloy::providers::{Provider, ProviderBuilder, WsConnect};
-use alloy::rpc::types::eth::BlockNumberOrTag;
 use futures_util::StreamExt;
 
-// --- 1. نظام التنبؤ بالزخم والمقايسة الزمنية (الكود الثاني) ---
+// --- 1. نظام التنبؤ بالزخم والمقايسة الزمنية الدقيقة (جعلناه Pub للاختبار) ---
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Direction {
+pub enum Direction {
     Peak,
     Bottom,
     Stable,
@@ -19,16 +18,17 @@ struct SystemState {
     timestamp: Instant,
 }
 
-struct MachineMetric {
+// جعلناه Pub لكي يقرأه ملف الفحص الصارم
+pub struct MachineMetric {
     last_state: Option<SystemState>,
 }
 
 impl MachineMetric {
-    fn new() -> Self {
+    pub fn new() -> Self {
         MachineMetric { last_state: None }
     }
 
-    fn update_and_predict(&mut self, current_value: f64) -> (Direction, f64) {
+    pub fn update_and_predict(&mut self, current_value: f64) -> (Direction, f64) {
         let now = Instant::now();
         
         if let Some(ref prev) = self.last_state {
@@ -55,12 +55,12 @@ impl MachineMetric {
     }
 }
 
-// --- 2. النظام الديناميكي لإدارة الانهيار السببي والتوازي (الكود الأول) ---
+// --- 2. النظام الديناميكي لإدارة الانهيار السببي والتوازي ---
 #[derive(Clone, Debug)]
 pub struct QuantumNode {
     pub id: usize,
-    pub energy_scale: BigUint, // يمثل حجم السيولة بالأرقام الفلكية لمنع أخطاء التقريب
-    pub frequency: f64,        // يمثل السعر/الانحراف اللحظي المكتشف
+    pub energy_scale: BigUint,
+    pub frequency: f64,
 }
 
 pub struct CausalCollapseSystem {
@@ -90,7 +90,6 @@ impl CausalCollapseSystem {
         let mut ordered_nodes = self.nodes.clone();
         ordered_nodes.sort_by(|a, b| b.energy_scale.cmp(&a.energy_scale));
 
-        // معالجة مكثفة وموازية لأحواض السيولة والعملات عبر رقاقات المعالج الفندقية لسرعة الاكتساح
         let active_nodes: Vec<QuantumNode> = ordered_nodes.par_iter().map(|node| {
             let mut triggered = node.clone();
             if triggered.frequency == 0.0 {
@@ -107,7 +106,6 @@ impl CausalCollapseSystem {
         let mut cumulative_frequency = active_nodes[0].frequency;
         let mut active_count = 1.0;
 
-        // التصفية التراكمية المحكمة (Pass 1)
         for i in 1..active_nodes.len() {
             let next = &active_nodes[i];
             let current_avg_freq = cumulative_frequency / active_count;
@@ -147,7 +145,6 @@ impl CausalCollapseSystem {
             }
         }
 
-        // خياطة الفجوات المحمية لاقتناص المسارات المركبة (Pass 2)
         let final_avg_freq = cumulative_frequency / active_count;
 
         for buffered_node in skipped_buffer {
@@ -168,50 +165,42 @@ impl CausalCollapseSystem {
     }
 }
 
-// --- 3. دالة إرسال الأمر الصافي الفوري إلى العقد الذكي المنشور ---
 fn trigger_on_chain_arbitrage(contract_address: &str, target_path: Vec<usize>) {
     println!("🚀 [BOT -> CONTRACT] Executing Atomic Multi-Swap Command!");
-    println!("⛓️ Target deployed contract: {}", contract_address);
     println!("🔗 Atomic Route Dispatched: {:?}", target_path);
+    println!("🔗 Target deployed contract: {}", contract_address);
 }
 
-// --- 4. الدالة الرئيسية المربوطة بالـ WebSocket الحقيقي لـ Alchemy ---
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🤖 Initializing Predictive MEV Bot Core via Alloy...");
 
-    // قراءة رابط الـ WebSocket السري وجلب عنوان العقد من متغيرات بيئة الـ CI
     let ws_url = std::env::var("ALCHEMY_BASE_RPC_URL")
         .unwrap_or_else(|_| "wss://://alchemy.com".to_string());
     let contract_addr = std::env::var("CONTRACT_ADDR")
         .unwrap_or_else(|_| "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string());
 
-    // تهيئة محرك التنبؤ بالزخم
     let mut radar = MachineMetric::new();
 
-    // الاتصال الفوري بـ Alchemy لاستقبال تدفق كتل وبلوك شبكة Base Sepolia حية
     let ws = WsConnect::new(ws_url);
     let provider = ProviderBuilder::new().on_ws(ws).await?;
     println!("📡 WebSocket Connection established with Alchemy Base Sepolia!");
 
-    // الاشتراك في تدفق الكتل الجديدة بشكل مستمر ودائم (Stream)
     let mut block_stream = provider.subscribe_blocks().await?.into_stream();
 
-    // الاستماع الحي (الزطي) بـ 0 غاز أثناء معالجة الأسعار خارج الشبكة
     while let Some(block) = block_stream.next().await {
-        let block_number = block.header.number;
+        // ◄ [التصحيح هنا] - فك تغليف رقم البلوك المظلي بأمان تام عبر unwrap_or
+        let block_number = block.header.number.unwrap_or(0);
         println!("📦 Caught New Block Production on Base: #{}", block_number);
 
-        // محاكاة قراءة تحديثات أسعار الـ Pools (KyberSwap / Uniswap) القادمة في البلوك الحالي
+        // ◄ [التصحيح هنا] - الحساب مباشرة على المتغير الرقمي الصافي
         let simulated_market_price = 1.005 - (block_number % 3) as f64 * 0.01;
 
-        // تشغيل الرادار التنبؤي لحساب سرعة وزخم التغير
         let (direction, velocity) = radar.update_and_predict(simulated_market_price);
 
         if direction == Direction::Peak || direction == Direction::Bottom {
             println!("⚡ [RADAR ALERT] Velocity Pivot Discovered: {:.4} | Computing path...", velocity);
 
-            // تغذية خوارزمية الانهيار السببي بالعملات والسيولة لتصفية المسار بالتوازي
             let nodes = vec![
                 QuantumNode { id: 1, energy_scale: BigUint::from(3000000u64), frequency: simulated_market_price },
                 QuantumNode { id: 2, energy_scale: BigUint::from(1000000u64), frequency: 0.01 },
@@ -221,7 +210,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let system = CausalCollapseSystem::new(nodes);
             let optimized_path = system.execute_collapse();
 
-            // إرسال المعاملة الفورية المكتسحة لـ القرض الفلاشي والـ Swaps داخل الشبكة
             trigger_on_chain_arbitrage(&contract_addr, optimized_path);
         }
     }
