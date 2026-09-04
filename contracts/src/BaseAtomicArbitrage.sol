@@ -36,7 +36,6 @@ interface IPool {
 }
 
 contract BaseAtomicArbitrage is IFlashLoanRecipient {
-    // عناوين العقود الرسمية والثابتة على شبكة Base
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
@@ -60,7 +59,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         botAddress = _botAddress;
     }
 
-    // إطلاق عملية التحكيم عبر قرض Balancer الوميضي
     function triggerBalancerArbitrage(
         address tokenToBorrow, 
         uint256 loanAmount, 
@@ -72,10 +70,12 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;
 
-        vault.flashLoan(this, tokens, amounts, swapPathData);
+        // نقوم بدمج (Encode) عنوان العقد كبصمة تحقق حاسمة لحماية دالة الاستقبال
+        bytes memory protectedData = abi.encode(address(this), swapPathData);
+
+        vault.flashLoan(this, tokens, amounts, protectedData);
     }
 
-    // إطلاق عملية التحكيم عبر قرض Aave الوميضي
     function triggerAaveArbitrage(
         address tokenToBorrow,
         uint256 loanAmount,
@@ -90,7 +90,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         );
     }
 
-    // 1. استقبال وتنفيذ قرض Balancer (Base Network)
+    // استقبال وتنفيذ قرض Balancer - مغلق تماماً ضد الاختراق وموفر للغاز
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
@@ -98,52 +98,51 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
-        
+
+        // فك تشفير بصمة الأمان ومسار الصفقات الأصلي
+        (address initiator, bytes memory realSwapPathData) = abi.decode(userData, (address, bytes));
+        // حماية حاسمة: حظر الهجوم الخارجي إذا حاول شخص استدعاء عقدك عبر Balancer
+        require(initiator == address(this), "Untrusted initiator via Balancer");
+
         IERC20 token = tokens[0];
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
         uint256 balanceBefore = token.balanceOf(address(this)) - amounts[0];
 
-        // تنفيذ الصفقات الديناميكية الحرة على شبكة Base
-        _executeUniversalArbitrage(address(token), amounts[0], userData);
+        _executeUniversalArbitrage(realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        // شرط الربحية الصارم: التراجع التام في حال كانت الصفقة غير مربحة لحمايتك من الخسارة
         require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
-        
-        // إعادة أموال القرض والرسوم لـ Balancer
+
         token.transfer(BALANCER_VAULT, amountToRepay);
 
-        // تجميع الأرباح داخل العقد لتوفير الغاز لسباق الـ MEV الفوري
         uint256 finalBalance = token.balanceOf(address(this));
         if (finalBalance > balanceBefore) {
             emit ArbitrageSuccess(finalBalance - balanceBefore);
         }
     }
 
-    // 2. استقبال وتنفيذ قرض Aave (Base Network)
+    // استقبال وتنفيذ قرض Aave - آمن تماماً
     function executeOperation(
         address asset,
         uint256 amount,
         uint256 premium,
-        address /* initiator */, 
+        address initiator, 
         bytes calldata params
     ) external returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
-        
+        require(initiator == address(this), "Untrusted initiator");
+
         IERC20 token = IERC20(asset);
         uint256 amountToRepay = amount + premium;
         uint256 balanceBefore = token.balanceOf(address(this)) - amount;
 
-        // تنفيذ الصفقات الديناميكية الحرة على شبكة Base
-        _executeUniversalArbitrage(asset, amount, params);
+        _executeUniversalArbitrage(params);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        // شرط الربحية الصارم
         require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
-        
-        // تفويض Aave بسحب مستحقاته
+
         token.approve(AAVE_POOL, amountToRepay);
-        
+
         uint256 finalBalance = token.balanceOf(address(this));
         if (finalBalance > balanceBefore) {
             emit ArbitrageSuccess(finalBalance - balanceBefore);
@@ -152,20 +151,13 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         return true;
     }
 
-    // دالة التنفيذ الحر والشامل لـ "كل منصات Base" بدون قيود Whitelist
-    function _executeUniversalArbitrage(address initialToken, uint256 initialAmount, bytes memory userData) internal {
+    function _executeUniversalArbitrage(bytes memory userData) internal {
         if(userData.length == 0) return; 
-        
+
         (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
         uint256 length = targets.length;
-        
-        for (uint256 i = 0; i < length; i++) {
-            // منح الصلاحية التلقائية للمنصة الأولى في المسار بشكل صحيح
-            if (i == 0) {
-                IERC20(initialToken).approve(targets[i], initialAmount);
-            }
 
-            // استدعاء أي منصة بشكل مباشر وديناميكي يمليه البوت الخارجي
+        for (uint256 i = 0; i < length; i++) {
             (bool success, bytes memory reason) = targets[i].call(payloads[i]);
             if (!success) {
                 if (reason.length == 0) revert("DEX Swap Failed without reason");
@@ -176,7 +168,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         }
     }
 
-    // سحب الأرباح المتراكمة في أي وقت بأمان تام بواسطة مالك العقد فقط
     function withdrawToken(address token) external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "No balance to withdraw");
