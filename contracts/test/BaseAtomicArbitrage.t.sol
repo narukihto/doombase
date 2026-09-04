@@ -4,6 +4,11 @@ pragma solidity 0.8.10;
 import "forge-std/Test.sol";
 import "../src/BaseAtomicArbitrage.sol";
 
+// تعريف واجهة مخصصة لدالة deal الخاصة بـ Foundry
+interface IDump {
+    function deal(address token, address to, uint256 give, bool adjust) external;
+}
+
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
@@ -14,9 +19,6 @@ contract BaseAtomicArbitrageTest is Test {
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CBETH = 0x2AE3F1ec7F1f5035ce7d4B987e61863f24d28A00;
 
-    // ✅ التعديل السحري: تحويل العنوان إلى رقم uint160 لمنع المترجم من فحص الـ Checksum نهائياً وتخطي الأخطاء
-    address public USDC_WHALE = address(uint160(0x3307e921665a61049Fb60408A34d286215B4975a));
-
     address owner = address(0x1337);
 
     function setUp() public {
@@ -26,15 +28,13 @@ contract BaseAtomicArbitrageTest is Test {
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
-        // 1. شحن العقد بـ 500 USDC عبر تحويل حقيقي من محفظة الحوت لتغذية الفروقات في السداد
-        vm.startPrank(USDC_WHALE);
-        IERC20(USDC).transfer(address(arbitrageContract), 500 * 10**6);
-        vm.stopPrank();
+        // ✅ الحل الجذري: شحن العقد بـ 500 USDC مباشرة عبر دالة deal السحرية لتجنب مشاكل أرصدة الحيتان
+        deal(USDC, address(arbitrageContract), 500 * 10**6);
 
-        // 2. البدء في تنفيذ محاكاة القرض الوميضي
+        // البدء في تنفيذ محاكاة القرض الوميضي باسم المالك
         vm.startPrank(owner);
 
-        // إسناد المصفوفات البرمجية باستخدام الـ Index الصحيح
+        // إسناد المصفوفات البرمجية بالطريقة المفضلة للمترجم
         address[] memory poolsPath = new address[](4);
         poolsPath[0] = USDC;
         poolsPath[1] = WETH;
@@ -49,6 +49,7 @@ contract BaseAtomicArbitrageTest is Test {
         bytes memory swapPathData = abi.encode(poolsPath, poolFees);
         uint256 loanAmount = 10000 * 10**6; // 10,000 USDC
 
+        // إطلاق عملية الموازنة والمحاكاة
         arbitrageContract.triggerAaveArbitrage(USDC, loanAmount, swapPathData);
 
         vm.stopPrank();
