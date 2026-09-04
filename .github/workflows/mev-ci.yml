@@ -15,7 +15,6 @@ jobs:
     - name: Checkout Code Base
       uses: actions/checkout@v4
       with:
-        # سحب جميع المكتبات والـ Submodules المتواجدة في مجلد lib تلقائياً لمنع خطأ غياب الملفات
         submodules: recursive
 
     - name: Set up Rust Environment
@@ -25,6 +24,14 @@ jobs:
 
     - name: Set up Foundry Toolchain
       uses: foundry-rs/foundry-toolchain@v1
+
+    # 💡 التعديل الجوهري والنهائي: إجبار الخادم على تحميل وتثبيت مكتبة forge-std رسمياً آلياً
+    - name: Force Install Foundry Dependencies
+      run: |
+        cd contracts
+        # تهيئة مجلد مخصص للمكتبات وتثبيت حزمة التطوير الرسمية فاوندي
+        mkdir -p lib
+        forge install foundry-rs/forge-std --no-commit
 
     # 1. عمل فورك حقيقي وتنافسي لشبكة Base Mainnet عبر رادارات Alchemy الواردة منك مجاناً
     - name: Initialize Base Mainnet Network Local Fork
@@ -40,7 +47,7 @@ jobs:
         ALCHEMY_BASE_URL: ${{ secrets.ALCHEMY_BASE_RPC_URL }}
       run: |
         cd contracts
-        # اختبار العقد مباشرة بالاعتماد على المسارات الحتمية المعرفة في الـ foundry.toml
+        # اختبار العقد مباشرة بالاعتماد على المكتبات الحية التي تم تحميلها آلياً
         forge test --fork-url $ALCHEMY_BASE_URL -vvv
 
     # 3. تشغيل جناح الفحص القاسي للتأكد من سرعة التوازي ومقاومة الضوضاء السعرية في البوت
