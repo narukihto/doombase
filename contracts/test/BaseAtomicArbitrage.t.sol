@@ -7,8 +7,8 @@ import "../src/BaseAtomicArbitrage.sol";
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
-    // 💡 تم تصحيح الـ Checksum بالكامل ومطابقة العناوين لعقد العمل الأساسي لتجاوز فحص المترجم
-    address constant BASE_AAVE_POOL_PROVIDER = 0xe20fcBdbFFc4DD138ce8b2E6fBB6CB49777ad64d;
+    // ✅ تم تصحيح الـ Checksum بالكامل لتجاوز فحص المترجم (تعديل الأحرف الكبيرة والصغيرة)
+    address constant BASE_AAVE_POOL_PROVIDER = 0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D;
     address constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333;
 
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
