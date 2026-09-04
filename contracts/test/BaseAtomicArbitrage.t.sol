@@ -23,9 +23,6 @@ contract BaseAtomicArbitrageTest is Test {
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
-        // ✅ 1. إجبار المحاكاة على استخدام سقف غاز مرتفع جداً (أو غير محدود) لتفادي الـ Out of Gas الناتج عن بروتوكولات Aave و Uniswap معاً
-        vm.gas(15_000_000); 
-
         vm.startPrank(owner);
 
         deal(USDC, address(arbitrageContract), 500 * 10**6);
