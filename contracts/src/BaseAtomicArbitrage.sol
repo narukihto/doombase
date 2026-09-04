@@ -40,21 +40,30 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address public owner;
+    address public botAddress; // المحفظة الساخنة التابعة للبوت (Rust)
+
+    // شرط يسمح فقط للمالك أو للبوت المرخص بإطلاق القروض والتداول
+    modifier onlyAuthorized() {
+        require(msg.sender == owner || msg.sender == botAddress, "Not authorized");
+        _;
+    }
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
         _;
     }
 
-    constructor() {
+    // الـ Constructor يستقبل عنوان البوت عند أول عملية نشر
+    constructor(address _botAddress) {
         owner = msg.sender;
+        botAddress = _botAddress;
     }
 
     function triggerBalancerArbitrage(
         address tokenToBorrow, 
         uint256 loanAmount, 
         bytes calldata swapPathData
-    ) external onlyOwner {
+    ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow);
@@ -68,7 +77,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         address tokenToBorrow,
         uint256 loanAmount,
         bytes calldata swapPathData
-    ) external onlyOwner {
+    ) external onlyAuthorized {
         IPool(AAVE_POOL).flashLoanSimple(
             address(this),
             tokenToBorrow,
@@ -85,11 +94,10 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
-        // ✅ تحديد الـ Index الأول بدقة لقراءة مصفوفة المقرض بنجاح
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
-        
+
         _executeUniversalArbitrage(userData);
-        
+
         uint256 currentBalance = tokens[0].balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Balancer loan");
         tokens[0].transfer(BALANCER_VAULT, amountToRepay);
@@ -105,9 +113,9 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     ) external returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
         uint256 amountToRepay = amount + premium;
-        
+
         _executeUniversalArbitrage(params);
-        
+
         uint256 currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Aave loan");
         IERC20(asset).approve(AAVE_POOL, amountToRepay);
@@ -115,9 +123,9 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     }
 
     function _executeUniversalArbitrage(bytes memory userData) internal {
-        if(userData.length == 0) return; // تفادي الفشل في حالة الاختبارات الفارغة
+        if(userData.length == 0) return; 
         (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
-        
+
         for (uint256 i = 0; i < targets.length; i++) {
             (bool success, bytes memory reason) = targets[i].call(payloads[i]);
             if (!success) {
@@ -129,6 +137,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         }
     }
 
+    // إرسال الأرباح الصافية فوراً وتلقائياً لمالك العقد الأساسي لضمان الأمان الفائق
     function _payoutProfit(IERC20 token) internal {
         uint256 profit = token.balanceOf(address(this));
         if (profit > 0) {
@@ -136,6 +145,12 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         }
     }
 
+    // تتيح لك تحديث محفظة البوت في أي وقت مستقبلاً
+    function updateBotAddress(address _newBot) external onlyOwner {
+        botAddress = _newBot;
+    }
+
+    // سحب طارئ لأي عملات مودعة داخل العقد (لك أنت فقط)
     function emergencyWithdraw(address token) external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
         IERC20(token).transfer(owner, balance);
