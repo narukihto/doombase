@@ -18,7 +18,6 @@ jobs:
         # سحب جميع المكتبات والـ Submodules المتواجدة في مجلد lib تلقائياً لمنع خطأ غياب الملفات
         submodules: recursive
 
-    # 💡 تم تصحيح الأداة هنا إلى الاسم الرسمي الصحيح والمدعوم
     - name: Set up Rust Environment
       uses: dtolnay/rust-toolchain@master
       with:
@@ -41,9 +40,7 @@ jobs:
         ALCHEMY_BASE_URL: ${{ secrets.ALCHEMY_BASE_RPC_URL }}
       run: |
         cd contracts
-        # توليد مسارات المكتبات بدقة ومنع أخطاء المترجم
-        forge remappings > remappings.txt
-        # اختبار العقد مباشرة للتأكد من ربط منطق الاقتراض الديناميكي والـ Loops بنجاح
+        # اختبار العقد مباشرة بالاعتماد على المسارات الحتمية المعرفة في الـ foundry.toml
         forge test --fork-url $ALCHEMY_BASE_URL -vvv
 
     # 3. تشغيل جناح الفحص القاسي للتأكد من سرعة التوازي ومقاومة الضوضاء السعرية في البوت
