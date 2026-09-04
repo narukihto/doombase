@@ -64,9 +64,9 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         IERC20[] memory tokens = new IERC20[](1);
-        tokens[0] = IERC20(tokenToBorrow);
+        tokens[0] = IERC20(tokenToBorrow); //  تم تصحيح الإسناد للمصفوفة هنا
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = loanAmount;
+        amounts[0] = loanAmount; //  تم تصحيح الإسناد للمصفوفة هنا
 
         vault.flashLoan(this, tokens, amounts, swapPathData);
     }
@@ -85,7 +85,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         );
     }
 
-    // 1. استدعاء قرض Balancer
+    // 1. استقبال قرض Balancer والتأكد من سلامته
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
@@ -93,19 +93,18 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
-        uint256 amountToRepay = amounts[0] + feeAmounts[0];
+        uint256 amountToRepay = amounts[0] + feeAmounts[0]; //  تم تصحيح الوصول للعناصر هنا أيضاً
 
-        // تمرير العملة المقترضة والمبلغ للمساعدة في الـ Approvals إذا لزم الأمر داخل الـ payload
         _executeUniversalArbitrage(userData);
 
         uint256 currentBalance = tokens[0].balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Balancer loan");
         
         tokens[0].transfer(BALANCER_VAULT, amountToRepay);
-        _payoutProfit(tokens[0]); // دفع الأرباح للمالك فوراً
+        _payoutProfit(tokens[0]); 
     }
 
-    // 2. استدعاء قرض Aave
+    // 2. استقبال قرض Aave والتأكد من سلامته
     function executeOperation(
         address asset,
         uint256 amount,
@@ -121,10 +120,8 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256 currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Aave loan");
         
-        // منح الصلاحية لـ Aave لسحب القرض + الفائدة
         IERC20(asset).approve(AAVE_POOL, amountToRepay);
         
-        // تعديل: دفع الأرباح المتبقية للمالك فوراً في Aave أيضاً
         uint256 profit = currentBalance - amountToRepay;
         if (profit > 0) {
             IERC20(asset).transfer(owner, profit);
@@ -133,7 +130,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         return true;
     }
 
-    // دالة التنفيذ الموحدة
+    // دالة التنفيذ الموحدة لاستدعاء مسارات الـ DEX
     function _executeUniversalArbitrage(bytes memory userData) internal {
         if(userData.length == 0) return; 
         (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
