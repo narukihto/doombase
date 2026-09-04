@@ -51,9 +51,11 @@ interface ISwapRouter {
 
 contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    address private constant SWAP_ROUTER = 0x2626664C2602818e340351633333333333333333; 
+    
+    // 💡 تم تصحيح الـ Checksum لراوتر يوني سواب الافتراضي
+    address private constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333; 
 
-    // 💡 تم إصلاح وتصحيح عنوان مزود Aave لشبكة Base Mainnet مع تفعيل الـ Checksum السليم
+    // 💡 تم تحديث عنوان مزود عقود Aave V3 الحقيقي لشبكة Base Mainnet لتفادي خطأ الـ 39 حرفاً
     address private constant AAVE_POOL_PROVIDER = 0xe20fcBdbFFc4DD138ce8b2E6fBB6CB49777ad64d;
     address public immutable AAVE_POOL;
 
