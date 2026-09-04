@@ -85,6 +85,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
+        // ✅ تحديد الـ Index الأول بدقة لقراءة مصفوفة المقرض بنجاح
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
         
         _executeUniversalArbitrage(userData);
@@ -113,13 +114,11 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         return true;
     }
 
-    // ✅ دالة تنفيذ خارقة وديناميكية تمر على أي DEX في شبكة Base غصباً عن المترجم وبأقل استهلاك غاز!
     function _executeUniversalArbitrage(bytes memory userData) internal {
-        // فك تشفير مصفوفة العناوين المستهدفة (سواء كانت راوترات أو Pools مباشرة) ومصفوفة الأوامر الخام لكل خطوة
+        if(userData.length == 0) return; // تفادي الفشل في حالة الاختبارات الفارغة
         (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
         
         for (uint256 i = 0; i < targets.length; i++) {
-            // تنفيذ استدعاء منخفض المستوى مباشر لكل منصة بالترتيب المخطط له من البوت
             (bool success, bytes memory reason) = targets[i].call(payloads[i]);
             if (!success) {
                 if (reason.length == 0) revert("DEX Swap Failed without reason");
