@@ -47,8 +47,8 @@ jobs:
         ALCHEMY_BASE_URL: ${{ secrets.ALCHEMY_BASE_RPC_URL }}
       run: |
         cd contracts
-        # اختبار العقد مباشرة بالاعتماد على النسخة المتوافقة
-        forge test --fork-url $ALCHEMY_BASE_URL -vvv
+        # ✅ تم تحديث الأمر هنا بإضافة سقف غاز 15,000,000 لمنع فشل الـ Revert في مجمعات Aave و Uniswap معاً
+        forge test --fork-url $ALCHEMY_BASE_URL --gas-limit 15000000 -vvv
 
     # 3. تشغيل جناح الفحص القاسي للتأكد من سرعة التوازي ومقاومة الضوضاء السعرية في البوت
     - name: Run Strict Performance Tests (Strict Tests)
