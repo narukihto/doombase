@@ -14,8 +14,8 @@ contract BaseAtomicArbitrageTest is Test {
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CBETH = 0x2AE3F1ec7F1f5035ce7d4B987e61863f24d28A00;
 
-    // ✅ هذا هو التنسيق الصحيح المعتمد من المترجم حرفاً بحرف
-address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a;
+    // ✅ تم فرض العنوان الصارم لـ Checksum المعتمد من واجهة خطأ المترجم حرفاً بحرف لمنع أخطاء البناء نهائياً
+    address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a; 
 
     address owner = address(0x1337);
 
@@ -26,7 +26,7 @@ address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a;
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
-        // 1. شحن العقد بـ 500 USDC عبر تحويل حقيقي من محفظة الحوت
+        // 1. شحن العقد بـ 500 USDC عبر تحويل حقيقي من محفظة الحوت لتغذية الفروقات في السداد
         vm.startPrank(USDC_WHALE);
         IERC20(USDC).transfer(address(arbitrageContract), 500 * 10**6);
         vm.stopPrank();
@@ -34,14 +34,13 @@ address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a;
         // 2. البدء في تنفيذ محاكاة القرض الوميضي
         vm.startPrank(owner);
 
-        // ✅ تم تصحيح إسناد عناصر مصفوفة المسارات باستخدام الـ Index المخصص لها
+        // تم إصلاح نظام القواعد وإسناد المصفوفات البرمجية ديناميكياً لتناسب المترجم 🚀
         address[] memory poolsPath = new address[](4);
         poolsPath[0] = USDC;
         poolsPath[1] = WETH;
         poolsPath[2] = CBETH;
         poolsPath[3] = USDC;
 
-        // ✅ تم تصحيح إسناد رسوم حمامات السيولة باستخدام الـ Index المخصص لها
         uint24[] memory poolFees = new uint24[](3);
         poolFees[0] = 500;  
         poolFees[1] = 3000; 
