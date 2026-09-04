@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.26;
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -42,8 +42,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address public owner;
     address public botAddress; 
 
-    event ArbitrageSuccess(uint256 profit);
-
     modifier onlyAuthorized() {
         require(msg.sender == owner || msg.sender == botAddress, "Not authorized");
         _;
@@ -70,9 +68,9 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;
 
-        // نقوم بدمج (Encode) عنوان العقد كبصمة تحقق حاسمة لحماية دالة الاستقبال
-        bytes memory protectedData = abi.encode(address(this), swapPathData);
+        uint256 exactBalanceBefore = IERC20(tokenToBorrow).balanceOf(address(this));
 
+        bytes memory protectedData = abi.encode(address(this), exactBalanceBefore, swapPathData);
         vault.flashLoan(this, tokens, amounts, protectedData);
     }
 
@@ -81,16 +79,18 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256 loanAmount,
         bytes calldata swapPathData
     ) external onlyAuthorized {
+        uint256 exactBalanceBefore = IERC20(tokenToBorrow).balanceOf(address(this));
+        bytes memory encodedParams = abi.encode(exactBalanceBefore, swapPathData);
+
         IPool(AAVE_POOL).flashLoanSimple(
             address(this),
             tokenToBorrow,
             loanAmount,
-            swapPathData,
+            encodedParams,
             0
         );
     }
 
-    // استقبال وتنفيذ قرض Balancer - مغلق تماماً ضد الاختراق وموفر للغاز
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
@@ -99,29 +99,20 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
 
-        // فك تشفير بصمة الأمان ومسار الصفقات الأصلي
-        (address initiator, bytes memory realSwapPathData) = abi.decode(userData, (address, bytes));
-        // حماية حاسمة: حظر الهجوم الخارجي إذا حاول شخص استدعاء عقدك عبر Balancer
+        (address initiator, uint256 exactBalanceBefore, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, bytes));
         require(initiator == address(this), "Untrusted initiator via Balancer");
 
         IERC20 token = tokens[0];
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
-        uint256 balanceBefore = token.balanceOf(address(this)) - amounts[0];
+
+        token.approve(BALANCER_VAULT, amountToRepay);
 
         _executeUniversalArbitrage(realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
-
-        token.transfer(BALANCER_VAULT, amountToRepay);
-
-        uint256 finalBalance = token.balanceOf(address(this));
-        if (finalBalance > balanceBefore) {
-            emit ArbitrageSuccess(finalBalance - balanceBefore);
-        }
+        require(balanceAfter > (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
     }
 
-    // استقبال وتنفيذ قرض Aave - آمن تماماً
     function executeOperation(
         address asset,
         uint256 amount,
@@ -134,33 +125,43 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
 
         IERC20 token = IERC20(asset);
         uint256 amountToRepay = amount + premium;
-        uint256 balanceBefore = token.balanceOf(address(this)) - amount;
 
-        _executeUniversalArbitrage(params);
-
-        uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
+        (uint256 exactBalanceBefore, bytes memory realSwapPathData) = abi.decode(params, (uint256, bytes));
 
         token.approve(AAVE_POOL, amountToRepay);
 
-        uint256 finalBalance = token.balanceOf(address(this));
-        if (finalBalance > balanceBefore) {
-            emit ArbitrageSuccess(finalBalance - balanceBefore);
-        }
+        _executeUniversalArbitrage(realSwapPathData);
+
+        uint256 balanceAfter = token.balanceOf(address(this));
+        require(balanceAfter > (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
 
         return true;
     }
 
+    // هندسة جديدة بالكامل: البوت الخارجي يمرر مصفوفة التوكنات، الأهداف، والـ payloads لضمان دعم التحكيم متعدد العملات والمنصات دون هدر غاز
     function _executeUniversalArbitrage(bytes memory userData) internal {
         if(userData.length == 0) return; 
 
-        (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
+        // قمنا بتحديث التشفير ليشمل مصفوفة التوكنات والمبالغ لمنح الصلاحيات بدقة متناهية
+        (address[] memory tokensToApprove, address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], address[], bytes[]));
         uint256 length = targets.length;
 
         for (uint256 i = 0; i < length; i++) {
-            (bool success, bytes memory reason) = targets[i].call(payloads[i]);
+            address target = targets[i];
+            address token = tokensToApprove[i];
+            
+            require(target != address(this) && token != address(this), "Malicious target blocked");
+
+            // إذا كان التوكن ممرراً كعنوان صفري (0x0)، فهذا يعني أن هذه الخطوة لا تحتاج لـ approve (توفير غاز هائل وحل مشكلة USDT)
+            if (token != address(0)) {
+                // تصفير الصلاحية أولاً ثم إعادتها لحل مشكلة USDT والتوكنات المشابهة حتمياً
+                IERC20(token).approve(target, 0);
+                IERC20(token).approve(target, type(uint256).max);
+            }
+
+            (bool success, bytes memory reason) = target.call(payloads[i]);
             if (!success) {
-                if (reason.length == 0) revert("DEX Swap Failed without reason");
+                if (reason.length == 0) revert("DEX Swap Failed");
                 assembly {
                     revert(add(32, reason), mload(reason))
                 }
@@ -170,16 +171,11 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
 
     function withdrawToken(address token) external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
-        require(balance > 0, "No balance to withdraw");
+        require(balance > 0, "No balance");
         IERC20(token).transfer(owner, balance);
     }
 
     function updateBotAddress(address _newBot) external onlyOwner {
         botAddress = _newBot;
-    }
-
-    function emergencyWithdraw(address token) external onlyOwner {
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        IERC20(token).transfer(owner, balance);
     }
 }
