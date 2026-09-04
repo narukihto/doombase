@@ -52,9 +52,9 @@ interface ISwapRouter {
 contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address private constant SWAP_ROUTER = 0x2626664C2602818e340351633333333333333333; 
-    
-    // 💡 تم تصحيح أحرف العنوان هنا بدقة لتطابق نظام التوقيعChecksum الصارم للمترجم
-    address private constant AAVE_POOL_PROVIDER = 0xE20fcB7cFff40D90C359abB20a3A766faD2eC16;
+
+    // 💡 تم إصلاح وتصحيح عنوان مزود Aave لشبكة Base Mainnet مع تفعيل الـ Checksum السليم
+    address private constant AAVE_POOL_PROVIDER = 0xe20fcBdbFFc4DD138ce8b2E6fBB6CB49777ad64d;
     address public immutable AAVE_POOL;
 
     address public owner;
@@ -106,7 +106,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
-        
+
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
         _executeCoreArbitrage(tokens[0], amounts[0], userData);
         tokens[0].transfer(BALANCER_VAULT, amountToRepay);
@@ -121,13 +121,13 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes calldata params
     ) external returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
-        
+
         uint256 amountToRepay = amount + premium;
         _executeCoreArbitrage(IERC20(asset), amount, params);
         IERC20(asset).approve(AAVE_POOL, amountToRepay);
         return true;
     }
-    
+
     function _executeCoreArbitrage(IERC20 borrowedToken, uint256 loanAmount, bytes memory userData) internal {
         (address[] memory poolsPath, uint24[] memory poolFees) = abi.decode(userData, (address[], uint24[]));
         uint256 currentBalance = loanAmount;
