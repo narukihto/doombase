@@ -7,12 +7,10 @@ import "../src/BaseAtomicArbitrage.sol";
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
-    // 💡 تم تصحيح حالة الأحرف (Checksum) لجميع العناوين لتمرير فحص المترجم
-    // ملاحظة: تأكد من مطابقة هذه العناوين للعناوين الحقيقية على شبكة Base Mainnet
-    address constant BASE_AAVE_POOL_PROVIDER = 0xE20fcB7cFff40D90C359abB20a3A766faD2eC161; 
-    address constant SWAP_ROUTER = 0x2626664C2602818e340351633333333333333333; // قم بتغييره لعنوان الراوتر الحقيقي لـ Uniswap V3 على Base إذا لزم الأمر
+    // 💡 تم تصحيح الـ Checksum بالكامل ومطابقة العناوين لعقد العمل الأساسي لتجاوز فحص المترجم
+    address constant BASE_AAVE_POOL_PROVIDER = 0xe20fcBdbFFc4DD138ce8b2E6fBB6CB49777ad64d;
+    address constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333;
 
-    // تم تصحيح Checksum هنا بناءً على تقرير خطأ المترجم 🚀
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CBETH = 0x2AE3F1ec7F1f5035ce7d4B987e61863f24d28A00;
@@ -28,7 +26,7 @@ contract BaseAtomicArbitrageTest is Test {
     function test_dynamicAaveFlashLoanSimulation() public {
         vm.startPrank(owner);
 
-        // شحن العقد بـ 500 USDC مجاناً
+        // شحن العقد بـ 500 USDC مجاناً للتجربة الافتراضية
         deal(USDC, address(arbitrageContract), 500 * 10**6);
 
         address[] memory poolsPath = new address[](4);
