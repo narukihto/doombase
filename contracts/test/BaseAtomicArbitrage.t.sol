@@ -4,11 +4,6 @@ pragma solidity 0.8.10;
 import "forge-std/Test.sol";
 import "../src/BaseAtomicArbitrage.sol";
 
-// تعريف واجهة مخصصة لدالة deal الخاصة بـ Foundry
-interface IDump {
-    function deal(address token, address to, uint256 give, bool adjust) external;
-}
-
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
@@ -28,13 +23,19 @@ contract BaseAtomicArbitrageTest is Test {
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
-        // ✅ الحل الجذري: شحن العقد بـ 500 USDC مباشرة عبر دالة deal السحرية لتجنب مشاكل أرصدة الحيتان
+        // 1. شحن العقد بـ 500 USDC مباشرة عبر دالة deal السحرية
         deal(USDC, address(arbitrageContract), 500 * 10**6);
 
         // البدء في تنفيذ محاكاة القرض الوميضي باسم المالك
         vm.startPrank(owner);
 
-        // إسناد المصفوفات البرمجية بالطريقة المفضلة للمترجم
+        // ✅ إعطاء صلاحية لمجمع Aave من داخل العقد لتفادي رفض طلب القرض الوميضي (Flashloan)
+        vm.stopPrank();
+        vm.prank(address(arbitrageContract));
+        IERC20(USDC).approve(BASE_AAVE_POOL, type(uint256).max);
+        vm.startPrank(owner);
+
+        // إسناد المصفوفات البرمجية بالطريقة الصحيحة للمترجم
         address[] memory poolsPath = new address[](4);
         poolsPath[0] = USDC;
         poolsPath[1] = WETH;
@@ -49,7 +50,7 @@ contract BaseAtomicArbitrageTest is Test {
         bytes memory swapPathData = abi.encode(poolsPath, poolFees);
         uint256 loanAmount = 10000 * 10**6; // 10,000 USDC
 
-        // إطلاق عملية الموازنة والمحاكاة
+        // إطلاق عملية الموازنة والمحاكاة عبر Aave
         arbitrageContract.triggerAaveArbitrage(USDC, loanAmount, swapPathData);
 
         vm.stopPrank();
