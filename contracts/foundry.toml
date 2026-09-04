@@ -1,3 +1,4 @@
+
 [profile.default]
 # تحديد مجلد الأكواد المصدرية والمخرجات
 src = "src"
@@ -8,8 +9,8 @@ libs = ["lib"]
 optimizer = true
 optimizer_runs = 200
 
-# إصدار لغة Solidity المتوافق مع العقد وشبكة Base
-solc_version = "0.8.20"
+# تم التعديل إلى الإصدار المتوافق برمجياً وصارماً مع عقود Aave V3 لضمان نجاح الترجمة
+solc_version = "0.8.10"
 
 # إعدادات بيئة المحاكاة المحلية (Anvil) لضمان مطابقة وقت البلوك لشبكة Base
 block_time = 2
