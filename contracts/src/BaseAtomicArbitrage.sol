@@ -51,13 +51,10 @@ interface ISwapRouter {
 
 contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    
-    // 💡 تم تصحيح الـ Checksum لراوتر يوني سواب الافتراضي
     address private constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333; 
 
-    // ✅ تم تصحيح الـ Checksum لمزود عقود Aave V3 لتفادي خطأ بناء المترجم (تعديل الأحرف الكبيرة والصغيرة)
-    address private constant AAVE_POOL_PROVIDER = 0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D;
-    address public immutable AAVE_POOL;
+    // ✅ تم ربط عنوان الـ Pool المباشر لـ Aave V3 على شبكة Base لتفادي فشل الـ Provider في الـ Fork
+    address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address public owner;
 
@@ -68,7 +65,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
 
     constructor() {
         owner = msg.sender;
-        AAVE_POOL = IAddressProvider(AAVE_POOL_PROVIDER).getPool();
     }
 
     function triggerBalancerArbitrage(
@@ -110,7 +106,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
 
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
-        _executeCoreArbitrage(tokens[0], amounts[0], userData);
+        _executeCoreArbitrage(amounts[0], userData);
         tokens[0].transfer(BALANCER_VAULT, amountToRepay);
         _payoutProfit(tokens[0]);
     }
@@ -119,18 +115,18 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         address asset,
         uint256 amount,
         uint256 premium,
-        address initiator,
+        address /* initiator */, // 💡 تم التعليق لإلغاء تحذير المترجم
         bytes calldata params
     ) external returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
 
         uint256 amountToRepay = amount + premium;
-        _executeCoreArbitrage(IERC20(asset), amount, params);
+        _executeCoreArbitrage(amount, params);
         IERC20(asset).approve(AAVE_POOL, amountToRepay);
         return true;
     }
 
-    function _executeCoreArbitrage(IERC20 borrowedToken, uint256 loanAmount, bytes memory userData) internal {
+    function _executeCoreArbitrage(uint256 loanAmount, bytes memory userData) internal {
         (address[] memory poolsPath, uint24[] memory poolFees) = abi.decode(userData, (address[], uint24[]));
         uint256 currentBalance = loanAmount;
 
@@ -163,8 +159,4 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256 balance = IERC20(token).balanceOf(address(this));
         IERC20(token).transfer(owner, balance);
     }
-}
-
-interface IAddressProvider {
-    function getPool() external view returns (address);
 }
