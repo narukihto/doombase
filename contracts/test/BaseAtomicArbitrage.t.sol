@@ -7,8 +7,8 @@ import "../src/BaseAtomicArbitrage.sol";
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
-    // ✅ تم تصحيح الـ Checksum بالكامل لتجاوز فحص المترجم (تعديل الأحرف الكبيرة والصغيرة)
-    address constant BASE_AAVE_POOL_PROVIDER = 0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D;
+    // ✅ تم تعديل العنوان ليتطابق مع العقد الفعلي مباشرة
+    address constant BASE_AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
     address constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333;
 
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -26,7 +26,6 @@ contract BaseAtomicArbitrageTest is Test {
     function test_dynamicAaveFlashLoanSimulation() public {
         vm.startPrank(owner);
 
-        // شحن العقد بـ 500 USDC مجاناً للتجربة الافتراضية
         deal(USDC, address(arbitrageContract), 500 * 10**6);
 
         address[] memory poolsPath = new address[](4);
@@ -43,7 +42,6 @@ contract BaseAtomicArbitrageTest is Test {
         bytes memory swapPathData = abi.encode(poolsPath, poolFees);
         uint256 loanAmount = 10000 * 10**6; // 10,000 USDC
 
-        // إطلاق القرض الوميضي التجريبي عبر شبكة Base الافتراضية
         arbitrageContract.triggerAaveArbitrage(USDC, loanAmount, swapPathData);
 
         vm.stopPrank();
