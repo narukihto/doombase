@@ -35,25 +35,8 @@ interface IPool {
     ) external;
 }
 
-interface ISwapRouter {
-    struct ExactInputSingleParams {
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        uint160 sqrtPriceLimitX96;
-    }
-    function exactInputSingle(ExactInputSingleParams calldata params) external returns (uint256 amountOut);
-}
-
 contract BaseAtomicArbitrage is IFlashLoanRecipient {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    address private constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333; 
-
-    // مجمع Aave V3 المباشر لشبكة Base
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address public owner;
@@ -73,10 +56,8 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes calldata swapPathData
     ) external onlyOwner {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
-
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow);
-
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;
 
@@ -104,14 +85,12 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
-
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
-        _executeCoreArbitrage(amounts[0], userData);
         
-        // تغطية العجز تلقائياً من الرصيد الاحتياطي للعقد
+        _executeUniversalArbitrage(userData);
+        
         uint256 currentBalance = tokens[0].balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Balancer loan");
-        
         tokens[0].transfer(BALANCER_VAULT, amountToRepay);
         _payoutProfit(tokens[0]);
     }
@@ -124,37 +103,30 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes calldata params
     ) external returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
-
         uint256 amountToRepay = amount + premium;
-        _executeCoreArbitrage(amount, params);
         
-        // تغطية العجز تلقائياً من الـ 500 USDC الاحتياطية المودعة في العقد لتفادي الـ Revert لعدم وجود فرصة ربح حقيقية لحظية
+        _executeUniversalArbitrage(params);
+        
         uint256 currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= amountToRepay, "Insufficient balance for Aave loan");
-
         IERC20(asset).approve(AAVE_POOL, amountToRepay);
         return true;
     }
 
-    function _executeCoreArbitrage(uint256 loanAmount, bytes memory userData) internal {
-        (address[] memory poolsPath, uint24[] memory poolFees) = abi.decode(userData, (address[], uint24[]));
-        uint256 currentBalance = loanAmount;
-
-        for (uint256 i = 0; i < poolsPath.length - 1; i++) {
-            IERC20(poolsPath[i]).approve(SWAP_ROUTER, currentBalance);
-
-            ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-                tokenIn: poolsPath[i],
-                tokenOut: poolsPath[i + 1],
-                fee: poolFees[i],
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: currentBalance,
-                amountOutMinimum: 1, 
-                sqrtPriceLimitX96: 0
-            });
-
-            currentBalance = ISwapRouter(SWAP_ROUTER).exactInputSingle(params);
+    // ✅ دالة تنفيذ خارقة وديناميكية تمر على أي DEX في شبكة Base غصباً عن المترجم وبأقل استهلاك غاز!
+    function _executeUniversalArbitrage(bytes memory userData) internal {
+        // فك تشفير مصفوفة العناوين المستهدفة (سواء كانت راوترات أو Pools مباشرة) ومصفوفة الأوامر الخام لكل خطوة
+        (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
+        
+        for (uint256 i = 0; i < targets.length; i++) {
+            // تنفيذ استدعاء منخفض المستوى مباشر لكل منصة بالترتيب المخطط له من البوت
+            (bool success, bytes memory reason) = targets[i].call(payloads[i]);
+            if (!success) {
+                if (reason.length == 0) revert("DEX Swap Failed without reason");
+                assembly {
+                    revert(add(32, reason), mload(reason))
+                }
+            }
         }
     }
 
