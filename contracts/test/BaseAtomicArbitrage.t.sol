@@ -7,7 +7,6 @@ import "../src/BaseAtomicArbitrage.sol";
 contract BaseAtomicArbitrageTest is Test {
     BaseAtomicArbitrage public arbitrageContract;
 
-    // ✅ تم تعديل العنوان ليتطابق مع العقد الفعلي مباشرة
     address constant BASE_AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
     address constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333;
 
@@ -24,6 +23,9 @@ contract BaseAtomicArbitrageTest is Test {
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
+        // ✅ 1. إجبار المحاكاة على استخدام سقف غاز مرتفع جداً (أو غير محدود) لتفادي الـ Out of Gas الناتج عن بروتوكولات Aave و Uniswap معاً
+        vm.gas(15_000_000); 
+
         vm.startPrank(owner);
 
         deal(USDC, address(arbitrageContract), 500 * 10**6);
