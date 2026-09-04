@@ -14,8 +14,8 @@ contract BaseAtomicArbitrageTest is Test {
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CBETH = 0x2AE3F1ec7F1f5035ce7d4B987e61863f24d28A00;
 
-    // ✅ تم تصحيح الـ Checksum بدقة لعنوان محفظة الحوت
-    address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a; 
+    // ✅ هذا هو التنسيق الصحيح المعتمد من المترجم حرفاً بحرف
+address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a;
 
     address owner = address(0x1337);
 
