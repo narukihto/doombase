@@ -14,8 +14,8 @@ contract BaseAtomicArbitrageTest is Test {
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CBETH = 0x2AE3F1ec7F1f5035ce7d4B987e61863f24d28A00;
 
-    // ✅ عنوان محفظة حوت (Whale) حقيقية تمتلك سيولة USDC ضخمة على شبكة BaseMainnet
-    address constant USDC_WHALE = 0x3307e921665a61049FB60408a34d286215b4975a; 
+    // ✅ تم تصحيح الـ Checksum لعنوان الحوت بناءً على تقرير المترجم
+    address constant USDC_WHALE = 0x3307e921665a61049Fb60408A34d286215b4975a; 
 
     address owner = address(0x1337);
 
@@ -26,7 +26,7 @@ contract BaseAtomicArbitrageTest is Test {
     }
 
     function test_dynamicAaveFlashLoanSimulation() public {
-        // ✅ 1. شحن العقد بـ 500 USDC عبر تحويل حقيقي من محفظة الحوت لتفادي تعارض دالة deal والـ Slots
+        // 1. شحن العقد بـ 500 USDC عبر تحويل حقيقي من محفظة الحوت لتفادي تعارض دالة deal والـ Slots
         vm.startPrank(USDC_WHALE);
         IERC20(USDC).transfer(address(arbitrageContract), 500 * 10**6);
         vm.stopPrank();
@@ -35,15 +35,15 @@ contract BaseAtomicArbitrageTest is Test {
         vm.startPrank(owner);
 
         address[] memory poolsPath = new address[](4);
-        poolsPath[0] = USDC;
-        poolsPath[1] = WETH;
-        poolsPath[2] = CBETH;
-        poolsPath[3] = USDC;
+        poolsPath = USDC;
+        poolsPath = WETH;
+        poolsPath = CBETH;
+        poolsPath = USDC;
 
         uint24[] memory poolFees = new uint24[](3);
-        poolFees[0] = 500;  
-        poolFees[1] = 3000; 
-        poolFees[2] = 100;  
+        poolFees = 500;  
+        poolFees = 3000; 
+        poolFees = 100;  
 
         bytes memory swapPathData = abi.encode(poolsPath, poolFees);
         uint256 loanAmount = 10000 * 10**6; // 10,000 USDC
