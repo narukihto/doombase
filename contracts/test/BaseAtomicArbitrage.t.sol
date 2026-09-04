@@ -22,20 +22,34 @@ contract BaseAtomicArbitrageTest is Test {
         vm.stopPrank();
     }
 
+    // 💡 تم فصل اختبار Aave في دالة منفصلة
     function test_dynamicAaveFlashLoanSimulation() public {
-        // 1. شحن العقد بـ 500 USDC مباشرة عبر دالة deal السحرية
         deal(USDC, address(arbitrageContract), 500 * 10**6);
 
-        // البدء في تنفيذ محاكاة القرض الوميضي باسم المالك
         vm.startPrank(owner);
+        address[] memory poolsPath = new address[](4);
+        poolsPath[0] = USDC;
+        poolsPath[1] = WETH;
+        poolsPath[2] = CBETH;
+        poolsPath[3] = USDC;
 
-        // ✅ إعطاء صلاحية لمجمع Aave من داخل العقد لتفادي رفض طلب القرض الوميضي (Flashloan)
+        uint24[] memory poolFees = new uint24[](3);
+        poolFees[0] = 500;  
+        poolFees[1] = 3000; 
+        poolFees[2] = 100;  
+
+        bytes memory swapPathData = abi.encode(poolsPath, poolFees);
+        uint256 loanAmount = 10000 * 10**6;
+
+        arbitrageContract.triggerAaveArbitrage(USDC, loanAmount, swapPathData);
         vm.stopPrank();
-        vm.prank(address(arbitrageContract));
-        IERC20(USDC).approve(BASE_AAVE_POOL, type(uint256).max);
-        vm.startPrank(owner);
+    }
 
-        // إسناد المصفوفات البرمجية بالطريقة الصحيحة للمترجم
+    // ✅ دالة اختبار جديدة ومستقلة تماماً لمحاكاة قرض Balancer Vault وتخطي مشاكل Aave
+    function test_dynamicBalancerFlashLoanSimulation() public {
+        deal(USDC, address(arbitrageContract), 500 * 10**6);
+
+        vm.startPrank(owner);
         address[] memory poolsPath = new address[](4);
         poolsPath[0] = USDC;
         poolsPath[1] = WETH;
@@ -50,9 +64,8 @@ contract BaseAtomicArbitrageTest is Test {
         bytes memory swapPathData = abi.encode(poolsPath, poolFees);
         uint256 loanAmount = 10000 * 10**6; // 10,000 USDC
 
-        // إطلاق عملية الموازنة والمحاكاة عبر Aave
-        arbitrageContract.triggerAaveArbitrage(USDC, loanAmount, swapPathData);
-
+        // إطلاق القرض الوميضي عبر Balancer Vault 🚀
+        arbitrageContract.triggerBalancerArbitrage(USDC, loanAmount, swapPathData);
         vm.stopPrank();
     }
 }
