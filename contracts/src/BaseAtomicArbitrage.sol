@@ -55,8 +55,8 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     // 💡 تم تصحيح الـ Checksum لراوتر يوني سواب الافتراضي
     address private constant SWAP_ROUTER = 0x2626664c2602818e340351633333333333333333; 
 
-    // 💡 تم تحديث عنوان مزود عقود Aave V3 الحقيقي لشبكة Base Mainnet لتفادي خطأ الـ 39 حرفاً
-    address private constant AAVE_POOL_PROVIDER = 0xe20fcBdbFFc4DD138ce8b2E6fBB6CB49777ad64d;
+    // ✅ تم تصحيح الـ Checksum لمزود عقود Aave V3 لتفادي خطأ بناء المترجم (تعديل الأحرف الكبيرة والصغيرة)
+    address private constant AAVE_POOL_PROVIDER = 0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D;
     address public immutable AAVE_POOL;
 
     address public owner;
