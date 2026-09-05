@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
@@ -48,7 +47,6 @@ interface IPool {
 
 contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    // تم تحديث عنوان Aave V3 لشبكة Base الرسمي والمؤكد لعام 2026
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address public owner;                      
@@ -79,10 +77,11 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     function triggerBalancerArbitrage(
         address tokenToBorrow, 
         uint256 loanAmount, 
-        bytes calldata swapPathData // البوت يرسل هنا مباشرة abi.encode(targets, payloads)
+        bytes calldata swapPathData 
     ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         
+        // [تعديل ميكانيكي حرج] صياغة المصفوفة الصحيحة لـ Balancer
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow); 
         uint256[] memory amounts = new uint256[](1);
@@ -97,7 +96,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     function triggerAaveArbitrage(
         address tokenToBorrow,
         uint256 loanAmount,
-        bytes calldata swapPathData // البوت يرسل هنا مباشرة abi.encode(targets, payloads)
+        bytes calldata swapPathData 
     ) external onlyAuthorized {
         uint256 exactBalanceBefore = IERC20(tokenToBorrow).balanceOf(address(this));
         bytes memory encodedParams = abi.encode(msg.sender, exactBalanceBefore, tokenToBorrow, swapPathData);
@@ -122,6 +121,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, address, bytes));
         require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
+        // [تعديل ميكانيكي حرج] سحب العناصر من المصفوفة باستخدام الـ Index الصحيح
         IERC20 token = tokens[0]; 
         uint256 amountToRepay = amounts[0] + feeAmounts[0]; 
 
@@ -130,6 +130,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         uint256 balanceAfter = token.balanceOf(address(this));
         require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
 
+        token.approve(BALANCER_VAULT, 0);
         require(token.approve(BALANCER_VAULT, amountToRepay), "Balancer approve failed");
     }
 
@@ -154,6 +155,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         uint256 balanceAfter = token.balanceOf(address(this));
         require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
 
+        token.approve(AAVE_POOL, 0);
         require(token.approve(AAVE_POOL, amountToRepay), "Aave approve failed");
 
         return true;
@@ -162,7 +164,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     function _executeUniversalArbitrage(bytes memory realSwapPathData) internal {
         if(realSwapPathData.length == 0) return; 
 
-        // فك تشفير نظيف ومباشر يطابق التمرير من دوال التفعيل
         (address[] memory targets, bytes[] memory payloads) = abi.decode(realSwapPathData, (address[], bytes[]));
         uint256 length = targets.length;
 
@@ -172,10 +173,9 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
             address target = targets[i];
             
             require(target != address(this), "Self-call blocked");
-            
-            // السماح باستدعاء عقود التوكنز لعمل Approve، أو العقود الموثقة بالـ Whitelist (مثل الـ DEX Routers)
-            require(whitelistedTargets[target] || _isContract(target), "Target unauthorized");
+            require(whitelistedTargets[target], "Target unauthorized");
 
+            // تنفذ الـ payload الممرر مباشرة (البوت يمرر الـ Approve والـ Swap معاً للمنصة المستهدفة)
             (bool success, bytes memory returnData) = target.call(payloads[i]);
             
             if (!success) {
@@ -189,15 +189,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
                 }
             }
         }
-    }
-
-    // دالة داخلية للتحقق من أن العنوان هو عقد لتجنب إرسال payloads لعناوين عادية
-    function _isContract(address account) internal view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(account)
-        }
-        return size > 0;
     }
 
     function withdrawToken(address token) external onlyOwner {
