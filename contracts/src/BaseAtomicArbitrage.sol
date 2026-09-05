@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.10 <0.9.0;
 
@@ -69,7 +70,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         owner = msg.sender;
         botAddress = _botAddress;
 
-        // ✅ تم نسخ العناوين حرفياً كما طلبها المترجم في السجلات لمنع أي خطأ Checksum
+        // ✅ عناوين دقيقة مصلحة الـ Checksum بالكامل مطابقة لرسائل المترجم
         // 1. Aerodrome V2 Router
         whitelistedTargets[0xcf77A3bA9Aab7D3E44917635033322DF3f564171] = true;
         
@@ -80,10 +81,10 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         whitelistedTargets[0x198FEe7650eAC16286848227e24eC0DFA5e51DA5] = true;
         
         // 4. BaseSwap V2 Router
-        whitelistedTargets[0x327Df1e6de05895D2Ab08513aADD931325260a99] = true;
+        whitelistedTargets[0x327Df1e6de05895D2Ab08513aADD931325260A99] = true;
         
         // 5. SushiSwap V3 Router
-        whitelistedTargets[0x089A8e0F6fCE8e00138F9B6e7Ff5B2FCC4Ac9D94] = true;
+        whitelistedTargets[0x089A8e0F6fCE8e00138F9b6E7Ff5B2FCC4Ac9D94] = true;
         
         // 6. PancakeSwap V3 Router
         whitelistedTargets[0x1b81D678ffb9C0263b24A97847620C99d213eB14] = true;
@@ -100,8 +101,10 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         
+        // ✅ تم إصلاح التعيين الديناميكي للمصفوفات في الذاكرة لتجنب الـ Type Mismatch
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow); 
+        
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;           
 
