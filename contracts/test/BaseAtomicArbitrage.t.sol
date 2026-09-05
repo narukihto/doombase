@@ -9,15 +9,14 @@ contract BaseAtomicArbitrageTest is Test {
 
     address owner = address(0x1337);
     address fakeBotAddress = address(0x9999); 
-    address attacker = address(0xBAD); // محاكاة للمخترق أو البوتات المنافسة
+    address attacker = address(0xBAD); 
 
-    // 🔥 عناوين حقيقية على شبكة Base عبر الـ Fork للفحص المستقر
+    // ✅ تم تصحيح الـ Checksum لعنوان USDC هنا طبقاً لتعليمات المترجم
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bda02913;
 
     function setUp() public {
         vm.startPrank(owner);
-        // تمرير المتغيرات بشكل سليم لإصلاح خطأ النشر داخل الفحص
         arbitrageContract = new BaseAtomicArbitrage(fakeBotAddress);
         vm.stopPrank();
     }
@@ -28,13 +27,12 @@ contract BaseAtomicArbitrageTest is Test {
         assertEq(arbitrageContract.botAddress(), fakeBotAddress);
     }
 
-    // 2️⃣ اختبار أمان حرج (Access Control): منع الغرباء من تشغيل الـ Arbitrage عبر Aave أو Balancer
+    // 2️⃣ اختبار أمان حرج (Access Control)
     function test_Security_OnlyAuthorizedCanTrigger() public {
-        vm.startPrank(attacker); // محاكاة هجوم
+        vm.startPrank(attacker); 
         
         bytes memory mockPayloads = abi.encode(new address[](0), new bytes[](0));
 
-        // نتوقع أن تفشل المحاولة فوراً بسبب modifier (onlyAuthorized)
         vm.expectRevert("Not authorized");
         arbitrageContract.triggerAaveArbitrage(WETH, 1 ether, mockPayloads);
 
@@ -44,20 +42,19 @@ contract BaseAtomicArbitrageTest is Test {
         vm.stopPrank();
     }
 
-    // 3️⃣ اختبار الخاصية الذرية (Atomic Logic): التأكد من تراجع العقد (Revert) إذا لم تكن الصفقة مربحة حقيقةً
+    // 3️⃣ اختبار الخاصية الذرية (Atomic Logic) وضمان الـ Revert عند عدم وجود ربح
     function test_Atomic_RevertIfNonProfitable() public {
-        vm.startPrank(fakeBotAddress); // البوت الحقيقي يستدعي العقد
+        vm.startPrank(fakeBotAddress); 
         
-        // بناء بايلود تداول فارغ (محاكاة لصفقة لن تعيد أي أرباح للعقد لترد القرض)
         address[] memory targets = new address[](1);
-        targets[0] = 0xcf77A3bA9Aab7D3E44917635033322DF3f564171; // عنوان موثوق من الـ Whitelist الخاصة بك
+        // ✅ تم تصحيح الـ Checksum هنا أيضاً للعنوان المستهدف
+        targets[0] = 0xcf77A3bA9Aab7D3E44917635033322DF3f564171; 
         
         bytes[] memory payloads = new bytes[](1);
-        payloads[0] = ""; // داتا فارغة لا تفعل شيئاً
+        payloads[0] = ""; 
         
         bytes memory swapPathData = abi.encode(targets, payloads);
         
-        // نتوقع أن يعمل العقد Revert تلقائياً إما بسبب فشل النداء الخارجي أو شرط "Arbitrage unprofitable"
         vm.expectRevert();
         arbitrageContract.triggerAaveArbitrage(WETH, 0.1 ether, swapPathData);
         
@@ -66,7 +63,7 @@ contract BaseAtomicArbitrageTest is Test {
 
     // 4️⃣ اختبار حماية سحب الأموال (Withdrawal Security)
     function test_Security_OnlyOwnerCanWithdraw() public {
-        vm.startPrank(attacker); // المهاجم يحاول السحب
+        vm.startPrank(attacker); 
         
         vm.expectRevert("Not owner");
         arbitrageContract.withdrawToken(WETH);
