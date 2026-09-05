@@ -45,8 +45,8 @@ interface IPool {
     ) external;
 }
 
-contract BaseMEVAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
-    // عناوين العقود لشبكة Base وثابتة لتقليل الغاز
+// ⚠️ تم إرجاع الاسم الأصلي كما هو ليتوافق مع ملف التست الخاص بك
+contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
@@ -70,8 +70,7 @@ contract BaseMEVAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver
         owner = msg.sender;
         botAddress = _botAddress;
 
-        // تم كتابة العناوين مباشرة بصيغة الحروف الصغيرة (Lowercase Hex) 
-        // هذا الإجراء يوفر أكثر من 80% من غاز النشر ويحذف دالة التحويل المعقدة تماماً
+        // العناوين بصيغة الحروف الصغيرة الموفرة للغاز لشبكة Base دون استخدام دالة المعالجة النصية
         whitelistedTargets[0xcf77a3ba9aab7d3e44917635033322df3f564171] = true;
         whitelistedTargets[0x2626664c2603336e57b271c5c0b26f421741e481] = true;
         whitelistedTargets[0x198fee7650eac16286848227e24ec0dfa5e51da5] = true;
