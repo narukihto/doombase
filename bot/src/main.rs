@@ -1,10 +1,16 @@
-use num_bigint::BigUint;
-use num_traits::ToPrimitive;
-use rayon::prelude::*;
-use std::time::Instant;
-use alloy::providers::ProviderBuilder;
 
-// --- 1. نظام التنبؤ بالزخم والمقايسة الزمنية الدقيقة ---
+use num_bigint::BigUint;
+use num_traits::{ToPrimitive, One};
+use rayon::prelude::*;
+use std::time::{Instant, Duration};
+use alloy::{
+    providers::{Provider, ProviderBuilder},
+    signers::local::PrivateKeySigner,
+    network::EthereumWallet,
+    primitives::{address, Address, Bytes},
+    sol,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Direction {
     Peak,
@@ -28,13 +34,13 @@ impl MachineMetric {
 
     pub fn update_and_predict(&mut self, current_value: f64) -> (Direction, f64) {
         let now = Instant::now();
-        
+
         if let Some(ref prev) = self.last_state {
             let delta_t = now.duration_since(prev.timestamp).as_secs_f64();
-            
+
             if delta_t > 0.0 {
                 let v_inst = (current_value - prev.value) / delta_t;
-                
+
                 let direction = if v_inst > 1e-9 {
                     Direction::Peak
                 } else if v_inst < -1e-9 {
@@ -53,7 +59,6 @@ impl MachineMetric {
     }
 }
 
-// --- 2. النظام الديناميكي لإدارة الانهيار السببي والتوازي ---
 #[derive(Clone, Debug)]
 pub struct QuantumNode {
     pub id: usize,
@@ -153,7 +158,6 @@ impl CausalCollapseSystem {
             }
 
             let scale_factor = 1.0 / (buffered_node.energy_scale.to_f64().unwrap_or(1.0) + 1.0);
-
             if pure_raw_dev * scale_factor <= self.threshold_limit {
                 final_path.push(buffered_node.id);
             }
@@ -163,44 +167,102 @@ impl CausalCollapseSystem {
     }
 }
 
-fn trigger_on_chain_arbitrage(contract_address: &str, target_path: Vec<usize>) {
-    println!("🚀 [BOT -> CONTRACT] Executing Atomic Multi-Swap Command!");
-    println!("🔗 Atomic Route Dispatched: {:?}", target_path);
-    println!("🔗 Target deployed contract: {}", contract_address);
+fn generate_astronomical_number(zeros: usize) -> BigUint {
+    let mut num_str = "1".to_string();
+    for _ in 0..zeros {
+        num_str.push('0');
+    }
+    BigUint::parse_bytes(num_str.as_bytes(), 10).unwrap_or_else(BigUint::one)
 }
 
-// تشغيل محاكمة دوران كاملة وعميقة ومطابقة تماماً لبروتوكولات المحاكاة بجيت هاب لبدء الإنتاج الفوري للأرقام
+sol! {
+    #[sol(rpc)]
+    contract BaseAtomicArbitrage {
+        function triggerBalancerArbitrage(address tokenToBorrow, uint256 loanAmount, bytes calldata swapPathData) external;
+        function triggerAaveArbitrage(address tokenToBorrow, uint256 loanAmount, bytes calldata swapPathData) external;
+    }
+}
+
+async fn trigger_on_chain_arbitrage<P, N>(
+    provider: &P,
+    contract_address: Address,
+    target_path: Vec<usize>
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    P: Provider<N>,
+    N: alloy::network::Network,
+{
+    println!("🚀 [BOT -> CONTRACT] Executing Atomic Multi-Swap Command!");
+    println!("🔗 Atomic Route Dispatched: {:?}", target_path);
+
+    if target_path.is_empty() { return Ok(()); }
+
+    let mock_target = address!("cf77A3bA9Aab7D3E44917635033322DF3f564171");
+    let targets_list = vec![mock_target];
+    let payloads_list = vec![Bytes::from(vec![0x00, 0x11, 0x22])]; 
+
+    let swap_path_data = alloy::dyn_abi::DynSolValue::Tuple(vec![
+        alloy::dyn_abi::DynSolValue::Array(targets_list.into_iter().map(alloy::dyn_abi::DynSolValue::Address).collect()),
+        alloy::dyn_abi::DynSolValue::Array(payloads_list.into_iter().map(alloy::dyn_abi::DynSolValue::Bytes).collect()),
+    ]).abi_encode();
+
+    let contract = BaseAtomicArbitrage::new(contract_address, provider);
+    let token_to_borrow = address!("4200000000000000000000000000000000000006"); 
+    let loan_amount = alloy::primitives::U256::from(1000000000000000000u64); 
+
+    println!("📡 Sending Flash Loan Transaction to Contract...");
+    
+    let tx_builder = contract.triggerBalancerArbitrage(token_to_borrow, loan_amount, swap_path_data.into());
+    let pending_tx = tx_builder.send().await?;
+    
+    println!("⏳ Transaction Sent! TX Hash: {:?}", pending_tx.tx_hash());
+    let receipt = pending_tx.get_receipt().await?;
+    println!("✅ Transaction Mined In Block: {:?}", receipt.block_number);
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🤖 Initializing Predictive MEV Bot Core via Alloy...");
 
-    let contract_addr = std::env::var("CONTRACT_ADDR")
+    let contract_addr_str = std::env::var("CONTRACT_ADDR")
         .unwrap_or_else(|_| "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string());
+    let contract_address: Address = contract_addr_str.parse()?;
+
+    let rpc_url = std::env::var("RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:8545".to_string());
+    let private_key_str = std::env::var("PRIVATE_KEY")
+        .unwrap_or_else(|_| "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string());
+
+    let signer: PrivateKeySigner = private_key_str.parse()?;
+    let wallet = EthereumWallet::from(signer);
+
+    println!("📡 Activating Connection to Network URL: {}", rpc_url);
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(rpc_url.parse()?);
 
     let mut radar = MachineMetric::new();
 
-    // الاتصال الفوري المباشر عبر الـ RPC لـ Anvil لمطابقة هيكلة جيت هاب الصارمة وعقد الفرك المنشور
-    let local_rpc = "http://127.0.0.1:8545".to_string();
-    println!("📡 Local Simulation Environment Activated via HTTP URL: {}", local_rpc);
-    
-    let _provider = ProviderBuilder::new().on_http(local_rpc.parse()?);
-    
-    // إطلاق مصفوفة المعالجة اللحظية لـ 100 بلوك متتالي وفك وحساب أربح مسارات التحكيم الدائري
     for mock_block in 1..=100 {
         println!("📦 Simulated Block Synced locally: #{}", mock_block);
         let simulated_market_price = 1.005 - (mock_block % 3) as f64 * 0.01;
         let (direction, velocity) = radar.update_and_predict(simulated_market_price);
 
         if direction == Direction::Peak || direction == Direction::Bottom {
-            println!("⚡ [RADAR ALERT] Velocity Pivot Discovered: {:.4} | Computing path...", velocity);
+            println!("⚡ [RADAR ALERT] Velocity Pivot Discovered: {:.4}", velocity);
             let nodes = vec![
-                QuantumNode { id: 1, energy_scale: BigUint::from(3000000u64), frequency: simulated_market_price },
-                QuantumNode { id: 2, energy_scale: BigUint::from(1000000u64), frequency: 0.01 },
-                QuantumNode { id: 3, energy_scale: BigUint::from(500000u64), frequency: 0.015 },
+                QuantumNode { id: 1, energy_scale: generate_astronomical_number(3000000u64), frequency: simulated_market_price },
+                QuantumNode { id: 2, energy_scale: generate_astronomical_number(1000000u64), frequency: 0.01 },
+                QuantumNode { id: 3, energy_scale: generate_astronomical_number(500000u64), frequency: 0.015 },
             ];
             let system = CausalCollapseSystem::new(nodes);
             let optimized_path = system.execute_collapse();
-            trigger_on_chain_arbitrage(&contract_addr, optimized_path);
+            
+            if let Err(e) = trigger_on_chain_arbitrage(&provider, contract_address, optimized_path).await {
+                println!("❌ Error executing on-chain command: {:?}", e);
+            }
         }
     }
 
