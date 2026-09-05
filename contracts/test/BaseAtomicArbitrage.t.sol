@@ -1,81 +1,86 @@
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.8.10 <0.9.0;
+use predictive_mev_bot::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction, generate_astronomical_number};
+use num_bigint::BigUint;
+use std::time::Instant;
 
-import "forge-std/Test.sol";
-import "../src/BaseAtomicArbitrage.sol";
+#[cfg(test)]
+mod strict_mev_tests {
+    use super::*;
 
-contract BaseAtomicArbitrageTest is Test {
-    BaseAtomicArbitrage public arbitrageContract;
+    #[test]
+    fn test_astronomical_scaling_and_memory_absorption() {
+        let start_time = Instant::now();
+        let mut nodes = Vec::new();
 
-    address owner = address(0x1337);
-    address fakeBotAddress = address(0x9999); 
-    address attacker = address(0xBAD); 
+        for i in 1..=100_000 {
+            nodes.push(QuantumNode {
+                id: i,
+                energy_scale: generate_astronomical_number(15 + (i % 10)),
+                frequency: 0.01,
+            });
+        }
 
-    address WETH;
-    address USDC;
-    address targetWhitelistAddress;
+        let system = CausalCollapseSystem::new(nodes);
+        let path = system.execute_collapse();
+        let duration = start_time.elapsed();
 
-    function setUp() public {
-        WETH = vm.parseAddress("0x4200000000000000000000000000000000000006");
-        USDC = vm.parseAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bda02913");
-        targetWhitelistAddress = vm.parseAddress("0xcf77A3bA9Aab7D3E44917635033322DF3f564171");
-
-        vm.startPrank(owner);
-        arbitrageContract = new BaseAtomicArbitrage(fakeBotAddress);
-        vm.stopPrank();
+        assert!(!path.is_empty());
+        assert!(duration.as_secs() < 5);
+        println!("✅ Test 1 Passed: 100k Pools processed in {:?}", duration);
     }
 
-    // 1️⃣ [PASS] اختبار النشر والترخيص الأساسي
-    function test_contractDeploymentAndAuthorization() public {
-        assertEq(arbitrageContract.owner(), owner);
-        assertEq(arbitrageContract.botAddress(), fakeBotAddress);
+    #[test]
+    fn test_shortest_path_and_circuit_breaker() {
+        let nodes = vec![
+            QuantumNode { id: 1, energy_scale: generate_astronomical_number(20), frequency: 0.01 },
+            QuantumNode { id: 2, energy_scale: generate_astronomical_number(18), frequency: 0.50 }, 
+            QuantumNode { id: 3, energy_scale: generate_astronomical_number(15), frequency: 0.01 }, 
+        ];
+
+        let mut system = CausalCollapseSystem::new(nodes);
+        system.threshold_limit = 0.10; 
+
+        let path = system.execute_collapse();
+
+        assert!(path.contains(&1));
+        assert!(!path.contains(&2)); 
+        assert!(path.contains(&3));
+        println!("✅ Test 2 Passed: Circuit breaker isolated volatile pools perfectly.");
     }
 
-    // 2️⃣ ✅ تم التعديل لتوقع Revert صامت متوافق مع العقد
-    function test_Security_OnlyAuthorizedCanTrigger() public {
-        vm.startPrank(attacker); 
+    #[test]
+    fn test_worst_case_scenario_noise() {
+        let mut radar = MachineMetric::new();
+        let fast_prices = vec![100.0, 100.005, 99.990, 99.985, 100.010];
         
-        bytes memory mockPayloads = abi.encode(new address[](0), new bytes[](0));
+        let mut peak_captured = false;
+        let mut bottom_captured = false;
 
-        // إزالة النص لأن العقد يعمل Revert صامت بدون داتا مخصصة
-        vm.expectRevert();
-        arbitrageContract.triggerAaveArbitrage(WETH, 1 ether, mockPayloads);
+        for price in fast_prices {
+            let (direction, _) = radar.update_and_predict(price);
+            if direction == Direction::Peak { peak_captured = true; }
+            if direction == Direction::Bottom { bottom_captured = true; }
+        }
 
-        vm.expectRevert();
-        arbitrageContract.triggerBalancerArbitrage(WETH, 1 ether, mockPayloads);
-        
-        vm.stopPrank();
+        assert!(peak_captured);
+        assert!(bottom_captured);
+        println!("✅ Test 3 Passed: Predictive Radar remained operational.");
     }
 
-    // 3️⃣ [PASS] اختبار الخاصية الذرية (Atomic Logic) وضمان الـ Revert عند عدم وجود ربح
-    function test_Atomic_RevertIfNonProfitable() public {
-        vm.startPrank(fakeBotAddress); 
-        
-        address[] memory targets = new address[](1);
-        targets[0] = targetWhitelistAddress; 
-        
-        bytes[] memory payloads = new bytes[](1);
-        payloads[0] = ""; 
-        
-        bytes memory swapPathData = abi.encode(targets, payloads);
-        
-        vm.expectRevert();
-        arbitrageContract.triggerAaveArbitrage(WETH, 0.1 ether, swapPathData);
-        
-        vm.stopPrank();
-    }
+    #[test]
+    fn test_discrete_discontinuous_cryptographic_break() {
+        let nodes = vec![
+            QuantumNode { id: 101, energy_scale: generate_astronomical_number(60), frequency: 0.11 },
+            QuantumNode { id: 102, energy_scale: generate_astronomical_number(58), frequency: 0.89 }, 
+            QuantumNode { id: 103, energy_scale: generate_astronomical_number(55), frequency: 0.12 },
+        ];
 
-    // 4️⃣ ✅ تم التعديل لتوقع Revert صامت متوافق مع دالة السحب
-    function test_Security_OnlyOwnerCanWithdraw() public {
-        vm.startPrank(attacker); 
-        
-        // إزالة النص ليطابق سلوك العقد الحقيقي
-        vm.expectRevert();
-        arbitrageContract.withdrawToken(WETH);
-        
-        vm.expectRevert();
-        arbitrageContract.withdrawETH();
-        
-        vm.stopPrank();
+        let mut system = CausalCollapseSystem::new(nodes);
+        system.threshold_limit = 0.05; 
+
+        let path = system.execute_collapse();
+
+        assert!(path.contains(&101));
+        assert!(path.contains(&103));
+        println!("✅ Test 4 Passed: Discontinuous network break handled safely.");
     }
 }
