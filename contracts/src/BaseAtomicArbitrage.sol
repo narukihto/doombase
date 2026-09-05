@@ -69,7 +69,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         owner = msg.sender;
         botAddress = _botAddress;
 
-        // ✅ تم تصحيح حالة الأحرف (Checksum) لجميع المنصات بناءً على طلب المترجم بدقة
+        // ✅ تم نسخ العناوين حرفياً كما طلبها المترجم في السجلات لمنع أي خطأ Checksum
         // 1. Aerodrome V2 Router
         whitelistedTargets[0xcf77A3bA9Aab7D3E44917635033322DF3f564171] = true;
         
