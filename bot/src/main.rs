@@ -1,12 +1,13 @@
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, One};
 use rayon::prelude::*;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use alloy::{
     providers::{Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
-    network::EthereumWallet,
+    network::{EthereumWallet, Ethereum},
     primitives::{address, Address, Bytes},
+    transports::http::Http,
     sol,
 };
 
@@ -182,14 +183,13 @@ sol! {
     }
 }
 
-async fn trigger_on_chain_arbitrage<P, N>(
-    provider: &P,
+async fn trigger_on_chain_arbitrage<P>(
+    provider: P,
     contract_address: Address,
     target_path: Vec<usize>
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    P: Provider<N>,
-    N: alloy::network::Network,
+    P: Provider<Http<alloy::transports::http::Client>, Ethereum> + Clone,
 {
     println!("🚀 [BOT -> CONTRACT] Executing Atomic Multi-Swap Command!");
     println!("🔗 Atomic Route Dispatched: {:?}", target_path);
@@ -198,7 +198,7 @@ where
 
     let mock_target = address!("cf77A3bA9Aab7D3E44917635033322DF3f564171");
     let targets_list = vec![mock_target];
-    let payloads_list = vec![Bytes::from(vec![0x00, 0x11, 0x22])]; 
+    let payloads_list = vec![vec![0x00, 0x11, 0x22]]; 
 
     let swap_path_data = alloy::dyn_abi::DynSolValue::Tuple(vec![
         alloy::dyn_abi::DynSolValue::Array(targets_list.into_iter().map(alloy::dyn_abi::DynSolValue::Address).collect()),
@@ -252,14 +252,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if direction == Direction::Peak || direction == Direction::Bottom {
             println!("⚡ [RADAR ALERT] Velocity Pivot Discovered: {:.4}", velocity);
             let nodes = vec![
-                QuantumNode { id: 1, energy_scale: generate_astronomical_number(3000000u64), frequency: simulated_market_price },
-                QuantumNode { id: 2, energy_scale: generate_astronomical_number(1000000u64), frequency: 0.01 },
-                QuantumNode { id: 3, energy_scale: generate_astronomical_number(500000u64), frequency: 0.015 },
+                QuantumNode { id: 1, energy_scale: generate_astronomical_number(3000000usize), frequency: simulated_market_price },
+                QuantumNode { id: 2, energy_scale: generate_astronomical_number(1000000usize), frequency: 0.01 },
+                QuantumNode { id: 3, energy_scale: generate_astronomical_number(500000usize), frequency: 0.015 },
             ];
             let system = CausalCollapseSystem::new(nodes);
             let optimized_path = system.execute_collapse();
             
-            if let Err(e) = trigger_on_chain_arbitrage(&provider, contract_address, optimized_path).await {
+            if let Err(e) = trigger_on_chain_arbitrage(provider.clone(), contract_address, optimized_path).await {
                 println!("❌ Error executing on-chain command: {:?}", e);
             }
         }
