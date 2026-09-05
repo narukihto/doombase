@@ -17,8 +17,8 @@ contract BaseAtomicArbitrageTest is Test {
         vm.stopPrank();
     }
 
-    // فحص البنية التحتية للتأكد من تعيين المالك وعنوان البوت المرخص بشكل سليم
-    function test_contractDeploymentAndAuthorization() public view {
+    // ✅ تمت إزالة 'view' لحل تعارض بيئة الفحص والمترجم بشكل نهائي
+    function test_contractDeploymentAndAuthorization() public {
         assertEq(arbitrageContract.owner(), owner);
         assertEq(arbitrageContract.botAddress(), fakeBotAddress);
     }
