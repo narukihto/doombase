@@ -4,14 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# بيئة التشغيل غير المتزامنة والاستماع اللحظي للشبكة
 tokio = { version = "1.38", features = ["full"] }
 futures-util = "0.3"
-
-# مكتبة الاتصال السريع بالبلوكشين وفك تشفير أحواض السيولة
-alloy = { version = "0.1", features = ["full", "providers", "pubsub"] }
-
-# مكتبات المعالجة المتوازية والحسابات الرياضية الفلكية لـ "الزطي"
+alloy = { version = "0.2", features = ["providers", "signers", "network", "rpc-types-eth", "contract", "pubsub"] }
 rayon = "1.10"
 num-bigint = "0.4"
 num-traits = "0.2"
