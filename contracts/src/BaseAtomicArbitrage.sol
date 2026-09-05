@@ -69,20 +69,21 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         owner = msg.sender;
         botAddress = _botAddress;
 
+        // ✅ تم تصحيح حالة الأحرف (Checksum) لجميع المنصات بناءً على طلب المترجم بدقة
         // 1. Aerodrome V2 Router
-        whitelistedTargets[0xcF77a3Ba9Aab7D3E44917635033322DF3f564171] = true;
+        whitelistedTargets[0xcf77A3bA9Aab7D3E44917635033322DF3f564171] = true;
         
         // 2. Uniswap V3 Router
         whitelistedTargets[0x2626664c2603336E57B271c5C0b26F421741e481] = true;
         
         // 3. Uniswap V2 Universal Router
-        whitelistedTargets[0x198fee7650eaC16286848227e24ec0dfa5e51da5] = true;
+        whitelistedTargets[0x198FEe7650eAC16286848227e24eC0DFA5e51DA5] = true;
         
         // 4. BaseSwap V2 Router
-        whitelistedTargets[0x327Df1E6de05895d2ab08513aaDD931325260a99] = true;
+        whitelistedTargets[0x327Df1e6de05895D2Ab08513aADD931325260a99] = true;
         
         // 5. SushiSwap V3 Router
-        whitelistedTargets[0x089a8e0f6FCE8e00138F9B6e7ff5B2fcC4Ac9D94] = true;
+        whitelistedTargets[0x089A8e0F6fCE8e00138F9B6e7Ff5B2FCC4Ac9D94] = true;
         
         // 6. PancakeSwap V3 Router
         whitelistedTargets[0x1b81D678ffb9C0263b24A97847620C99d213eB14] = true;
