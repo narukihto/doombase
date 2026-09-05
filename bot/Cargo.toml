@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }
 futures-util = "0.3"
-alloy = { version = "0.2", features = ["providers", "signers", "network", "rpc-types-eth", "contract", "pubsub"] }
+alloy = { version = "0.2", features = ["providers", "signers", "network", "rpc-types-eth", "contract", "pubsub", "signer-local", "transports"] }
 rayon = "1.10"
 num-bigint = "0.4"
 num-traits = "0.2"
