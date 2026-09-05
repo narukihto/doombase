@@ -225,4 +225,14 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         require(IERC20(token).transfer(owner, balance), "Transfer failed");
     }
 
-    function withdr
+    function withdrawETH() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No ETH balance");
+        (bool success, ) = owner.call{value: balance}("");
+        require(success, "ETH Transfer failed");
+    }
+
+    function updateBotAddress(address _newBot) external onlyOwner {
+        botAddress = _newBot;
+    }
+}
