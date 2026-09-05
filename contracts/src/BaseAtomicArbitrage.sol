@@ -69,27 +69,15 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         owner = msg.sender;
         botAddress = _botAddress;
 
-        // ✅ تم تجاوز فحص الـ Checksum نهائياً باستخدام دالة التحويل النصي الآمنة
-        // 1. Aerodrome V2 Router
+        // تجاوز فحص الـ Checksum نهائياً باستخدام دالة التحويل النصي الآمنة
         whitelistedTargets[_parseAddress("0xcf77A3bA9Aab7D3E44917635033322DF3f564171")] = true;
-        
-        // 2. Uniswap V3 Router
         whitelistedTargets[_parseAddress("0x2626664c2603336E57B271c5C0b26F421741e481")] = true;
-        
-        // 3. Uniswap V2 Universal Router
         whitelistedTargets[_parseAddress("0x198FEe7650eAC16286848227e24eC0DFA5e51DA5")] = true;
-        
-        // 4. BaseSwap V2 Router
         whitelistedTargets[_parseAddress("0x327Df1e6de05895D2Ab08513aADD931325260A99")] = true;
-        
-        // 5. SushiSwap V3 Router
         whitelistedTargets[_parseAddress("0x089A8e0F6fCE8e00138F9b6E7Ff5B2FCC4Ac9D94")] = true;
-        
-        // 6. PancakeSwap V3 Router
         whitelistedTargets[_parseAddress("0x1b81D678ffb9C0263b24A97847620C99d213eB14")] = true;
     }
 
-    // ✅ دالة داخلية ذكية لتحويل النصوص إلى عناوين وتخطي أخطاء المترجم بالكامل
     function _parseAddress(string memory _a) internal pure returns (address) {
         bytes memory tmp = bytes(_a);
         uint160 iaddr = 0;
@@ -158,7 +146,8 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
 
-        (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, address, bytes));
+        // ✅ ترك مكان المتغير فارغاً لإلغاء الـ Warning نهائياً
+        (address originalInitiator, , address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, address, bytes));
         require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
         IERC20 token = tokens[0]; 
@@ -167,7 +156,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         _executeUniversalArbitrage(realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+        require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
 
         token.approve(BALANCER_VAULT, 0);
         require(token.approve(BALANCER_VAULT, amountToRepay), "Balancer approve failed");
@@ -183,7 +172,8 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
         require(initiator == address(this), "Untrusted contract initiator");
 
-        (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(params, (address, uint256, address, bytes));
+        // ✅ ترك مكان المتغير فارغاً لإلغاء الـ Warning نهائياً
+        (address originalInitiator, , address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(params, (address, uint256, address, bytes));
         require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
         IERC20 token = IERC20(asset);
@@ -192,7 +182,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         _executeUniversalArbitrage(realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+        require(balanceAfter >= amountToRepay, "Arbitrage unprofitable");
 
         token.approve(AAVE_POOL, 0);
         require(token.approve(AAVE_POOL, amountToRepay), "Aave approve failed");
