@@ -70,7 +70,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         owner = msg.sender;
         botAddress = _botAddress;
 
-        // ✅ عناوين دقيقة مصلحة الـ Checksum بالكامل مطابقة لرسائل المترجم
+        // ✅ العناوين المحدثة بدقة تامة ومطابقة لرسائل الـ Checksum الأخيرة من المترجم
         // 1. Aerodrome V2 Router
         whitelistedTargets[0xcf77A3bA9Aab7D3E44917635033322DF3f564171] = true;
         
@@ -101,7 +101,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         
-        // ✅ تم إصلاح التعيين الديناميكي للمصفوفات في الذاكرة لتجنب الـ Type Mismatch
+        // ✅ تم تحديث طريقة التعيين لـ Memory Arrays باستخدام الفهرس لمنع خطأ الـ Type Mismatch
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow); 
         
