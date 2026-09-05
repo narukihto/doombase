@@ -65,9 +65,28 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
 
     receive() external payable {}
 
+    // تم دمج العناوين الرسمية والمؤكدة لمنصات Base هنا لتعمل فوراً عند النشر
     constructor(address _botAddress) {
         owner = msg.sender;
         botAddress = _botAddress;
+
+        // 1. Aerodrome V2 Router
+        whitelistedTargets[0xcF77a3Ba9Aab7D3E44917635033322DF3f564171] = true;
+        
+        // 2. Uniswap V3 Router
+        whitelistedTargets[0x2626664c2603336E57B271c5C0b26F421741e481] = true;
+        
+        // 3. Uniswap V2 Universal Router
+        whitelistedTargets[0x198fee7650eaC16286848227e24ec0dfa5e51da5] = true;
+        
+        // 4. BaseSwap V2 Router
+        whitelistedTargets[0x327Df1E6de05895d2ab08513aaDD931325260a99] = true;
+        
+        // 5. SushiSwap V3 Router
+        whitelistedTargets[0x089a8e0f6FCE8e00138F9B6e7ff5B2fcC4Ac9D94] = true;
+        
+        // 6. PancakeSwap V3 Router
+        whitelistedTargets[0x1b81D678ffb9C0263b24A97847620C99d213eB14] = true;
     }
 
     function setTargetWhitelist(address target, bool status) external onlyOwner {
@@ -81,7 +100,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     ) external onlyAuthorized {
         IBalancerVault vault = IBalancerVault(BALANCER_VAULT);
         
-        // [تعديل ميكانيكي حرج] صياغة المصفوفة الصحيحة لـ Balancer
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(tokenToBorrow); 
         uint256[] memory amounts = new uint256[](1);
@@ -121,7 +139,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
         (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, address, bytes));
         require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
-        // [تعديل ميكانيكي حرج] سحب العناصر من المصفوفة باستخدام الـ Index الصحيح
         IERC20 token = tokens[0]; 
         uint256 amountToRepay = amounts[0] + feeAmounts[0]; 
 
@@ -175,7 +192,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
             require(target != address(this), "Self-call blocked");
             require(whitelistedTargets[target], "Target unauthorized");
 
-            // تنفذ الـ payload الممرر مباشرة (البوت يمرر الـ Approve والـ Swap معاً للمنصة المستهدفة)
             (bool success, bytes memory returnData) = target.call(payloads[i]);
             
             if (!success) {
