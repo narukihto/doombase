@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity >=0.8.10 <0.9.0;
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -65,7 +65,6 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
 
     receive() external payable {}
 
-    // تم دمج العناوين الرسمية والمؤكدة لمنصات Base هنا لتعمل فوراً عند النشر
     constructor(address _botAddress) {
         owner = msg.sender;
         botAddress = _botAddress;
