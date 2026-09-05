@@ -3,6 +3,10 @@ name = "predictive_mev_bot"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "predictive_mev_bot"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }
 futures-util = "0.3"
