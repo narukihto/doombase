@@ -16,6 +16,16 @@ interface IFlashLoanRecipient {
     ) external;
 }
 
+interface IFlashLoanSimpleReceiver {
+    function executeOperation(
+        address asset,
+        uint256 amount,
+        uint256 premium,
+        address initiator,
+        bytes calldata params
+    ) external returns (bool);
+}
+
 interface IBalancerVault {
     function flashLoan(
         IFlashLoanRecipient recipient,
@@ -35,12 +45,14 @@ interface IPool {
     ) external;
 }
 
-contract BaseAtomicArbitrage is IFlashLoanRecipient {
+contract BaseAtomicArbitrage is IFlashLoanRecipient, IFlashLoanSimpleReceiver {
     address private constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address public constant AAVE_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address public owner;
     address public botAddress; 
+
+    mapping(address => bool) public whitelistedTargets;
 
     modifier onlyAuthorized() {
         require(msg.sender == owner || msg.sender == botAddress, "Not authorized");
@@ -57,6 +69,10 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         botAddress = _botAddress;
     }
 
+    function setTargetWhitelist(address target, bool status) external onlyOwner {
+        whitelistedTargets[target] = status;
+    }
+
     function triggerBalancerArbitrage(
         address tokenToBorrow, 
         uint256 loanAmount, 
@@ -70,7 +86,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
 
         uint256 exactBalanceBefore = IERC20(tokenToBorrow).balanceOf(address(this));
 
-        bytes memory protectedData = abi.encode(address(this), exactBalanceBefore, swapPathData);
+        bytes memory protectedData = abi.encode(msg.sender, exactBalanceBefore, tokenToBorrow, swapPathData);
         vault.flashLoan(this, tokens, amounts, protectedData);
     }
 
@@ -80,7 +96,7 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         bytes calldata swapPathData
     ) external onlyAuthorized {
         uint256 exactBalanceBefore = IERC20(tokenToBorrow).balanceOf(address(this));
-        bytes memory encodedParams = abi.encode(exactBalanceBefore, swapPathData);
+        bytes memory encodedParams = abi.encode(msg.sender, exactBalanceBefore, tokenToBorrow, swapPathData);
 
         IPool(AAVE_POOL).flashLoanSimple(
             address(this),
@@ -99,18 +115,18 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Untrusted lender");
 
-        (address initiator, uint256 exactBalanceBefore, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, bytes));
-        require(initiator == address(this), "Untrusted initiator via Balancer");
+        (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(userData, (address, uint256, address, bytes));
+        require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
         IERC20 token = tokens[0];
         uint256 amountToRepay = amounts[0] + feeAmounts[0];
 
-        token.approve(BALANCER_VAULT, amountToRepay);
-
-        _executeUniversalArbitrage(realSwapPathData);
+        _executeUniversalArbitrage(tokenToBorrow, realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter > (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+        require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+
+        require(token.approve(BALANCER_VAULT, amountToRepay), "Balancer approve failed");
     }
 
     function executeOperation(
@@ -119,60 +135,120 @@ contract BaseAtomicArbitrage is IFlashLoanRecipient {
         uint256 premium,
         address initiator, 
         bytes calldata params
-    ) external returns (bool) {
+    ) external override returns (bool) {
         require(msg.sender == AAVE_POOL, "Untrusted Aave pool");
-        require(initiator == address(this), "Untrusted initiator");
+        require(initiator == address(this), "Untrusted contract initiator");
+
+        (address originalInitiator, uint256 exactBalanceBefore, address tokenToBorrow, bytes memory realSwapPathData) = abi.decode(params, (address, uint256, address, bytes));
+        require(originalInitiator == owner || originalInitiator == botAddress, "Untrusted original initiator");
 
         IERC20 token = IERC20(asset);
         uint256 amountToRepay = amount + premium;
 
-        (uint256 exactBalanceBefore, bytes memory realSwapPathData) = abi.decode(params, (uint256, bytes));
-
-        token.approve(AAVE_POOL, amountToRepay);
-
-        _executeUniversalArbitrage(realSwapPathData);
+        _executeUniversalArbitrage(tokenToBorrow, realSwapPathData);
 
         uint256 balanceAfter = token.balanceOf(address(this));
-        require(balanceAfter > (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+        require(balanceAfter >= (exactBalanceBefore + amountToRepay), "Arbitrage unprofitable");
+
+        require(token.approve(AAVE_POOL, amountToRepay), "Aave approve failed");
 
         return true;
     }
 
-    // هندسة جديدة بالكامل: البوت الخارجي يمرر مصفوفة التوكنات، الأهداف، والـ payloads لضمان دعم التحكيم متعدد العملات والمنصات دون هدر غاز
-    function _executeUniversalArbitrage(bytes memory userData) internal {
+    // دالة المعالجة الاحترافية المكتوبة بلغة الـ Assembly (Yul) بالكامل لتدمير البطء وتوفير الغاز
+    function _executeUniversalArbitrage(address tokenToBorrow, bytes memory userData) internal {
         if(userData.length == 0) return; 
 
-        // قمنا بتحديث التشفير ليشمل مصفوفة التوكنات والمبالغ لمنح الصلاحيات بدقة متناهية
-        (address[] memory tokensToApprove, address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], address[], bytes[]));
+        (address[] memory targets, bytes[] memory payloads) = abi.decode(userData, (address[], bytes[]));
         uint256 length = targets.length;
 
-        for (uint256 i = 0; i < length; i++) {
-            address target = targets[i];
-            address token = tokensToApprove[i];
-            
-            require(target != address(this) && token != address(this), "Malicious target blocked");
+        require(length == payloads.length, "Length mismatch");
 
-            // إذا كان التوكن ممرراً كعنوان صفري (0x0)، فهذا يعني أن هذه الخطوة لا تحتاج لـ approve (توفير غاز هائل وحل مشكلة USDT)
-            if (token != address(0)) {
-                // تصفير الصلاحية أولاً ثم إعادتها لحل مشكلة USDT والتوكنات المشابهة حتمياً
-                IERC20(token).approve(target, 0);
-                IERC20(token).approve(target, type(uint256).max);
-            }
+        // استخدام القائمة البيضاء المخزنة في الـ mapping عبر الـ Assembly
+        bytes32 slot = clinitest_getMappingSlot(targets);
 
-            (bool success, bytes memory reason) = target.call(payloads[i]);
-            if (!success) {
-                if (reason.length == 0) revert("DEX Swap Failed");
-                assembly {
-                    revert(add(32, reason), mload(reason))
+        assembly {
+            let targetsOffset := add(targets, 32)
+            let payloadsOffset := add(payloads, 32)
+
+            for { let i := 0 } lt(i, length) { i := add(i, 1) } {
+                // جلب عنوان المنصة المستهدفة الحالية
+                let target := mload(add(targetsOffset, mul(i, 32)))
+                
+                // منع العقد من استدعاء نفسه
+                if eq(target, address()) {
+                    // Revert: Self-call blocked
+                    mstore(0, 0x08c379a0) // Selector لـ Error(string)
+                    mstore(32, 32)
+                    mstore(64, 16)
+                    mstore(96, "Self-call blocked")
+                    revert(0, 128)
+                }
+
+                // الحماية من الاختراق: تحقق On-chain عبر الـ Assembly أن الهدف مسموح به في الـ Whitelist
+                mstore(0, target)
+                mstore(32, slot)
+                let hashSlot := keccak256(0, 64)
+                let isWhitelisted := sload(hashSlot)
+                
+                if iszero(isWhitelisted) {
+                    mstore(0, 0x08c379a0)
+                    mstore(32, 32)
+                    mstore(64, 22)
+                    mstore(96, "Target not whitelisted")
+                    revert(0, 128)
+                }
+
+                // جلب الـ Payload الحالي ومؤشر البيانات الخاص به
+                let payload := mload(add(payloadsOffset, mul(i, 32)))
+                let payloadLength := mload(payload)
+                let payloadData := add(payload, 32)
+
+                // إذا كان الهدف هو عقد العملة المقترضة (لأجل الـ Approve)
+                if eq(target, tokenToBorrow) {
+                    if lt(payloadLength, 4) {
+                        mstore(0, 0x08c379a0)
+                        mstore(32, 32)
+                        mstore(64, 21)
+                        mstore(96, "Invalid token payload")
+                        revert(0, 128)
+                    }
+                    // قراءة الـ Selector أول 4 بايت
+                    let selector := and(mload(payloadData), 0xffffffff00000000000000000000000000000000000000000000000000000000)
+                    // التحقق الصارم: اسمح فقط بـ approve (0x095ea7b3) وامنع الـ Transfer نهائياً لحماية القرض
+                    if iszero(eq(selector, 0x095ea7b300000000000000000000000000000000000000000000000000000000)) {
+                        mstore(0, 0x08c379a0)
+                        mstore(32, 32)
+                        mstore(64, 29)
+                        mstore(96, "Direct token transfer blocked")
+                        revert(0, 128)
+                    }
+                }
+
+                // تنفيذ الـ Call بسرعة فائقة وعزل الـ Return data لتفادي تلف الـ Memory
+                let success := call(gas(), target, 0, payloadData, payloadLength, 0, 0)
+                
+                if iszero(success) {
+                    // في حال فشل الـ Swap، نقوم بعمل Revert فوري وتمرير السبب لـ صوليديتي لحفظ الغاز
+                    let size := returndatasize()
+                    returndatacopy(0, 0, size)
+                    revert(0, size)
                 }
             }
+        }
+    }
+
+    // دالة مساعدة داخلية لجلب موقع الـ Slot الخاص بالـ Whitelist لتسهيل قراءته في الـ Assembly
+    function clinitest_getMappingSlot(address[] memory) internal pure returns (bytes32 slot) {
+        assembly {
+            slot := whitelistedTargets.slot
         }
     }
 
     function withdrawToken(address token) external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "No balance");
-        IERC20(token).transfer(owner, balance);
+        require(IERC20(token).transfer(owner, balance), "Transfer failed");
     }
 
     function updateBotAddress(address _newBot) external onlyOwner {
