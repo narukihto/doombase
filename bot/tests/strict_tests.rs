@@ -1,18 +1,6 @@
-#[path = "../src/main.rs"]
-mod bot_core;
-
-use bot_core::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction};
+use predictive_mev_bot::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction, generate_astronomical_number};
 use num_bigint::BigUint;
-use num_traits::One;
 use std::time::{Instant, Duration};
-
-fn generate_astronomical_number(zeros: usize) -> BigUint {
-    let mut num_str = "1".to_string();
-    for _ in 0..zeros {
-        num_str.push('0');
-    }
-    BigUint::parse_bytes(num_str.as_bytes(), 10).unwrap_or_else(BigUint::one)
-}
 
 #[cfg(test)]
 mod strict_mev_tests {
@@ -62,9 +50,7 @@ mod strict_mev_tests {
     #[test]
     fn test_worst_case_scenario_noise() {
         let mut radar = MachineMetric::new();
-        
         let fast_prices = vec![100.0, 100.005, 99.990, 99.985, 100.010];
-        let interval = Duration::from_micros(1);
         
         let mut peak_captured = false;
         let mut bottom_captured = false;
@@ -73,12 +59,11 @@ mod strict_mev_tests {
             let (direction, _) = radar.update_and_predict(price);
             if direction == Direction::Peak { peak_captured = true; }
             if direction == Direction::Bottom { bottom_captured = true; }
-            std::thread::sleep(interval);
         }
 
         assert!(peak_captured);
         assert!(bottom_captured);
-        println!("✅ Test 3 Passed: Predictive Radar remained operational under extreme microseconds noise.");
+        println!("✅ Test 3 Passed: Predictive Radar remained operational.");
     }
 
     #[test]
