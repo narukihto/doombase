@@ -12,7 +12,7 @@ optimizer_runs = 200
 solc_version = "0.8.10"
 
 # ✅ إلغاء قيود الغاز في بيئة المحاكاة والاختبار عالمياً لمنع فشل مجمعات Aave و Uniswap
-gas_limit = 9223372036854775807
+gas_limit = "18446744073709551615" # تم التعديل إلى أقصى قيمة مدعومة برقم حقيقي (uint64 max) لمنع أخطاء التجميع
 block_gas_limit = 9223372036854775807
 
 # تثبيت مسارات استيراد المكتبات بشكل حتمي لمنع أخطاء بيئة جيت هاب
@@ -24,11 +24,12 @@ remappings = [
     "kyberswap/=lib/kyberswap-protocols/"
 ]
 
-# ✅ دمج وتحديث إعدادات anvil لمنع ظهور تحذيرات "unknown anvil config" في السجلات
+# ✅ دمج وتحديث إعدادات التخزين المؤقت للشبكة
 [profile.default.rpc_storage_caching]
 chains = "all"
 
-[profile.default.anvil]
+# ✅ الطريقة الرسمية لتعريف إعدادات anvil داخل بروفايل foundry لمنع التحذيرات
+[anvil]
 block_time = 2
 
 [rpc_endpoints]
