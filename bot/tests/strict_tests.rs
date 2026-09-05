@@ -1,6 +1,6 @@
 use predictive_mev_bot::{CausalCollapseSystem, QuantumNode, MachineMetric, Direction, generate_astronomical_number};
 use num_bigint::BigUint;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 
 #[cfg(test)]
 mod strict_mev_tests {
