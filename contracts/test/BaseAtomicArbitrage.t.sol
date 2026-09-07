@@ -31,51 +31,49 @@ contract BaseAtomicArbitrageTest is Test {
         assertEq(arbitrageContract.botAddress(), fakeBotAddress);
     }
 
-    // 2️⃣ ✅ تم التعديل لتوقع Revert صامت متوافق مع العقد
+    // 2️⃣ [PASS] اختبار الصلاحيات والتأكد من مطابقة رسائل الـ Require في المودواير
     function test_Security_OnlyAuthorizedCanTrigger() public {
         vm.startPrank(attacker); 
-        
+
         bytes memory mockPayloads = abi.encode(new address[](0), new bytes[](0));
 
-        // إزالة النص لأن العقد يعمل Revert صامت بدون داتا مخصصة
-        vm.expectRevert();
+        vm.expectRevert("Not authorized");
         arbitrageContract.triggerAaveArbitrage(WETH, 1 ether, mockPayloads);
 
-        vm.expectRevert();
+        vm.expectRevert("Not authorized");
         arbitrageContract.triggerBalancerArbitrage(WETH, 1 ether, mockPayloads);
-        
+
         vm.stopPrank();
     }
 
     // 3️⃣ [PASS] اختبار الخاصية الذرية (Atomic Logic) وضمان الـ Revert عند عدم وجود ربح
     function test_Atomic_RevertIfNonProfitable() public {
         vm.startPrank(fakeBotAddress); 
-        
+
         address[] memory targets = new address[](1);
         targets[0] = targetWhitelistAddress; 
-        
+
         bytes[] memory payloads = new bytes[](1);
         payloads[0] = ""; 
-        
+
         bytes memory swapPathData = abi.encode(targets, payloads);
-        
+
         vm.expectRevert();
         arbitrageContract.triggerAaveArbitrage(WETH, 0.1 ether, swapPathData);
-        
+
         vm.stopPrank();
     }
 
-    // 4️⃣ ✅ تم التعديل لتوقع Revert صامت متوافق مع دالة السحب
+    // 4️⃣ [PASS] اختبار صلاحيات السحب والتأكد من مطابقة رسالة الخطأ للمالك
     function test_Security_OnlyOwnerCanWithdraw() public {
         vm.startPrank(attacker); 
-        
-        // إزالة النص ليطابق سلوك العقد الحقيقي
-        vm.expectRevert();
+
+        vm.expectRevert("Not owner");
         arbitrageContract.withdrawToken(WETH);
-        
-        vm.expectRevert();
+
+        vm.expectRevert("Not owner");
         arbitrageContract.withdrawETH();
-        
+
         vm.stopPrank();
     }
 }
